@@ -4,3 +4,4 @@ requests
 statsmodels
 linearmodels
 openpyxl
+pyarrow
