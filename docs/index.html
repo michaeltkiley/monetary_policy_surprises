@@ -1,0 +1,1360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monetary Policy Surprises</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface:      #fcfcfb;
+    --page:         #f9f9f7;
+    --ink:          #0b0b0b;
+    --ink-soft:     #52514e;
+    --ink-faint:    #898781;
+    --grid:         #e1e0d9;
+    --baseline:     #c3c2b7;
+    --border:       rgba(11,11,11,0.10);
+    --s1: #2a78d6;   /* categorical slot 1: non_zlb_era / Baa */
+    --s2: #eb6834;   /* categorical slot 2: zlb_era / Aaa */
+    --s3: #1baf7a;   /* categorical slot 3: activity ratio */
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #d03b3b;
+    --good-soft: #e3f5e3;
+    --warning-soft: #fef3dc;
+    --critical-soft: #fbe2e2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --surface:    #1a1a19;
+      --page:       #0d0d0d;
+      --ink:        #ffffff;
+      --ink-soft:   #c3c2b7;
+      --ink-faint:  #898781;
+      --grid:       #2c2c2a;
+      --baseline:   #383835;
+      --border:     rgba(255,255,255,0.10);
+      --s1: #3987e5;
+      --s2: #d95926;
+      --s3: #199e70;
+      --good: #0ca30c;
+      --warning: #fab219;
+      --critical: #e66767;
+      --good-soft: #123312;
+      --warning-soft: #3a2e0d;
+      --critical-soft: #3a1414;
+    }
+  }
+  :root[data-theme="dark"] {
+    --surface:    #1a1a19;
+    --page:       #0d0d0d;
+    --ink:        #ffffff;
+    --ink-soft:   #c3c2b7;
+    --ink-faint:  #898781;
+    --grid:       #2c2c2a;
+    --baseline:   #383835;
+    --border:     rgba(255,255,255,0.10);
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --good: #0ca30c;
+    --warning: #fab219;
+    --critical: #e66767;
+    --good-soft: #123312;
+    --warning-soft: #3a2e0d;
+    --critical-soft: #3a1414;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page { max-width: 1080px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--s3); font-weight: 600; margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-family: 'Newsreader', Georgia, serif; font-weight: 500;
+    font-size: clamp(1.8rem, 3.5vw, 2.4rem); line-height: 1.15;
+    margin: 0 0 0.75rem; text-wrap: balance;
+  }
+  .lede { max-width: 62ch; color: var(--ink-soft); font-size: 1.02rem; margin: 0; }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem;
+    margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--ink-faint);
+  }
+  nav.tabs {
+    display: flex; gap: 0.4rem; margin: 2rem 0 0; border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    font-family: 'Public Sans', sans-serif; font-size: 0.92rem; font-weight: 600;
+    color: var(--ink-faint); background: none; border: none; cursor: pointer;
+    padding: 0.7rem 0.2rem; margin-right: 1.4rem; border-bottom: 2px solid transparent;
+  }
+  .tab-btn.active { color: var(--ink); border-bottom-color: var(--s1); }
+  .tab-btn:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+  .tab-panel { display: none; flex-direction: column; gap: 1.75rem; padding-top: 2rem; }
+  .tab-panel.active { display: flex; }
+  section.card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.75rem 1.9rem 2rem;
+  }
+  h2 { font-family: 'Newsreader', Georgia, serif; font-weight: 500; font-size: 1.3rem; margin: 0 0 0.4rem; }
+  .card-note { font-size: 0.9rem; color: var(--ink-soft); max-width: 68ch; margin: 0 0 1.1rem; }
+  .chart-scroll { overflow-x: auto; }
+  svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+  .axis-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; fill: var(--ink-faint); }
+  .grid-line { stroke: var(--grid); stroke-width: 1; }
+  .zero-line { stroke: var(--baseline); stroke-width: 1; }
+  .series-path { fill: none; stroke-width: 2; }
+  .band { opacity: 0.16; }
+  .legend { display: flex; gap: 1.1rem; flex-wrap: wrap; margin-top: 0.6rem; font-size: 0.82rem; color: var(--ink-soft); }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.4rem; vertical-align: -1px; }
+  .tooltip {
+    position: absolute; pointer-events: none; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; color: var(--ink);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12); opacity: 0; transition: opacity 0.1s;
+    white-space: nowrap; z-index: 5;
+  }
+  .chart-wrap { position: relative; }
+  .roll-stack { display: flex; flex-direction: column; gap: 1.4rem; }
+  .chart-sub-label {
+    font-family: 'Public Sans', sans-serif; font-weight: 600; font-size: 0.82rem;
+    color: var(--ink-soft); margin: 0 0 0.3rem;
+  }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.4rem; }
+  .stat-strip { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .stat-box {
+    background: var(--page); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.6rem 0.9rem; font-family: 'IBM Plex Mono', monospace;
+  }
+  .stat-box .l { font-size: 0.68rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-box .v { font-size: 1rem; font-weight: 600; }
+  table.simple { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+  table.simple th {
+    text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem;
+    text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint);
+    padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border);
+  }
+  table.simple td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; }
+  table.simple td.lbl { font-family: 'Public Sans', sans-serif; }
+  section.notes {
+    padding-top: 1.5rem; border-top: 1px solid var(--border);
+  }
+  section.notes h2 { font-size: 1rem; color: var(--ink-soft); margin: 0 0 0.9rem; }
+  section.notes ul { margin: 0; padding: 0 0 0 1.1rem; max-width: 72ch; }
+  section.notes li { font-size: 0.86rem; color: var(--ink-soft); margin-bottom: 0.7rem; }
+  section.notes li:last-child { margin-bottom: 0; }
+  section.notes li.disclaimer { color: var(--ink-faint); font-style: italic; }
+  section.notes b { color: var(--ink); font-weight: 600; }
+  section.notes a { color: var(--s1); text-decoration-color: var(--border); }
+  section.notes a:hover { text-decoration-color: currentColor; }
+  footer {
+    margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--ink-faint);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
+  }
+  @media (max-width: 640px) {
+    section.card { padding: 1.3rem 1.2rem 1.5rem; }
+    .page { padding: 2rem 1rem 3rem; }
+  }
+
+  .site-nav { border-bottom: 1px solid var(--border); background: var(--surface); }
+  .site-nav-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .site-nav .wordmark {
+    font-family: "Newsreader", Georgia, serif;
+    font-weight: 500;
+    font-size: 17px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .site-nav nav { display: flex; gap: 20px; }
+  .site-nav nav a {
+    font-family: "Public Sans", sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .site-nav nav a:hover, .site-nav nav a.active { color: var(--s1); }
+</style>
+</head>
+<body>
+
+<div class="site-nav">
+  <div class="site-nav-inner">
+    <a class="wordmark" href="https://michaeltkiley.github.io/">Michael T. Kiley</a>
+    <nav>
+      <a href="https://michaeltkiley.github.io/">Home</a>
+      <a href="https://michaeltkiley.github.io/cv.html">CV</a>
+      <a href="https://michaeltkiley.github.io/termprem/">Yield Curve Tracker</a>
+      <a href="https://michaeltkiley.github.io/monetary_policy_surprises/" class="active">Monetary Policy Expectations</a>
+    </nav>
+  </div>
+</div>
+
+<div class="page">
+
+  <p class="eyebrow">Monetary policy surprises</p>
+  <h1>Policy Surprise Dashboard</h1>
+  <p class="lede">
+    What markets expect from the Fed next, how Fed announcements move
+    markets, and how that's changed since rates hit zero -- for stocks and
+    for corporate borrowing costs, 1994 to today.
+  </p>
+  <div class="meta-row">
+    <span id="meta-asof"></span>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="tab-expectations">Rate Expectations</button>
+    <button class="tab-btn" data-tab="tab-surprises">Policy Surprises</button>
+    <button class="tab-btn" data-tab="tab-equity">Stocks</button>
+    <button class="tab-btn" data-tab="tab-corporate">Corporate Bonds</button>
+  </nav>
+
+  <section class="tab-panel active" id="tab-expectations">
+    <section class="card">
+      <h2>Where markets expect the fed funds rate to go</h2>
+      <p class="card-note">
+        The actual rate over the past month, plus what Fed funds futures are
+        pricing in for the months ahead, compared across two dates so you
+        can see how expectations have shifted (see legend for exact dates).
+      </p>
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-ff-path" viewBox="0 0 960 340" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="tt-ff-path"></div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--s3)"></span>Actual rate</span>
+        <span><span class="sw" style="background:var(--s1)"></span>Priced <span id="leg-ff-current"></span></span>
+        <span><span class="sw" style="background:var(--s2)"></span>Priced <span id="leg-ff-previous"></span></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 id="pdf3mo-h2">Rate probabilities, next contract 3+ months out</h2>
+      <p class="card-note">
+        How confident the options market is about where rates will land for
+        this contract, based on the prices traders are actually paying.
+        Each pair of bars compares pricing on two dates (see legend).
+      </p>
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-pdf-3mo" viewBox="0 0 960 300" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="tt-pdf-3mo"></div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--s1);opacity:0.45"></span><span id="leg-pdf3mo-current"></span></span>
+        <span><span class="sw" style="border:2px dashed var(--ink);background:none"></span><span id="leg-pdf3mo-previous"></span></span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 id="pdfdecny-h2">Rate probabilities, December next year</h2>
+      <p class="card-note">
+        The same view, further out -- for the contract covering the end of
+        the last quarter of next year.
+      </p>
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-pdf-decny" viewBox="0 0 960 300" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="tt-pdf-decny"></div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--s1);opacity:0.45"></span><span id="leg-pdfdecny-current"></span></span>
+        <span><span class="sw" style="border:2px dashed var(--ink);background:none"></span><span id="leg-pdfdecny-previous"></span></span>
+      </div>
+    </section>
+
+    <section class="notes">
+      <h2>Notes &amp; sources</h2>
+      <ul>
+        <li class="disclaimer">For informational purposes only. All
+          downloads and calculations are the author's own and may contain
+          errors -- don't rely on this for decisions or conclusions.
+          Verify independently with your own data and calculations before
+          using it for any purpose.</li>
+        <li><b>Rate expectations:</b> the Fed funds futures curve and SOFR
+          options-implied probabilities are both settlement-price data
+          from <a href="https://www.cmegroup.com/" target="_blank" rel="noopener">CME Group</a>,
+          with the probabilities extracted using the risk-neutral-density
+          method of Carlson, Craig, and Melick (2005), "<a href="https://www.clevelandfed.org/publications/working-paper/2005/wp-0507-recovering-market-expectations-of-fomc-rate-changes" target="_blank" rel="noopener">Recovering Market
+          Expectations of FOMC Rate Changes with Options on Federal Funds
+          Futures</a>," Federal Reserve Bank of Cleveland Working Paper No.
+          05-07 (published in the <i>Journal of Futures Markets</i>, 2005,
+          26(12), 1203&ndash;1242). The actual fed funds rate history is
+          FRED's <a href="https://fred.stlouisfed.org/series/DFF" target="_blank" rel="noopener">DFF</a> series.</li>
+      </ul>
+    </section>
+  </section>
+
+  <section class="tab-panel" id="tab-surprises">
+    <section class="card">
+      <h2>How much the Fed surprises markets</h2>
+      <p class="card-note">
+        Each bar is one Fed meeting: how much near-term rate expectations
+        moved (blue) and how much the 10-year Treasury yield moved (orange)
+        in the half hour around the announcement. Shading marks periods when
+        short-term rates were pinned near zero.
+      </p>
+      <div class="chart-wrap">
+        <div class="chart-scroll"><svg class="chart" id="chart-bars" viewBox="0 0 960 340" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div class="tooltip" id="tt-bars"></div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--s1)"></span>Near-term rate surprise</span>
+        <span><span class="sw" style="background:var(--s2)"></span>10-year Treasury surprise</span>
+        <span><span class="sw" style="background:var(--s1);opacity:0.35"></span>Near-zero rates (official dates)</span>
+        <span><span class="sw" style="background:var(--s1);opacity:0.75"></span>Near-zero rates (market-based)</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Short rates, long rates, and inflation expectations</h2>
+      <p class="card-note">
+        Each dot is one Fed meeting. Circles are normal times, triangles are
+        near-zero-rate periods; the 8 most recent meetings are filled in and
+        the latest is labeled. Right panel swaps the long-rate surprise for
+        the market's inflation expectations (5-year breakeven).
+      </p>
+      <div class="grid2">
+        <div class="chart-wrap">
+          <svg class="chart" id="chart-scatter1" viewBox="0 0 460 400" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="tooltip" id="tt-scatter1"></div>
+        </div>
+        <div class="chart-wrap">
+          <svg class="chart" id="chart-scatter2" viewBox="0 0 460 400" preserveAspectRatio="xMidYMid meet"></svg>
+          <div class="tooltip" id="tt-scatter2"></div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="border:1.5px solid var(--s1);background:none"></span>Normal</span>
+        <span><span class="sw" style="border:1.5px solid var(--s2);background:none"></span>Near-zero</span>
+        <span><span class="sw" style="background:var(--s3)"></span>Most recent (filled)</span>
+      </div>
+    </section>
+
+    <section class="notes">
+      <h2>Notes &amp; sources</h2>
+      <ul>
+        <li class="disclaimer">For informational purposes only. All
+          downloads and calculations are the author's own and may contain
+          errors -- don't rely on this for decisions or conclusions.
+          Verify independently with your own data and calculations before
+          using it for any purpose.</li>
+        <li><b>Data:</b> Fed-meeting surprises from the
+          <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event-Study Database</a>
+          (Acosta, Ajello, Bauer, Loria, and Miranda-Agrippino, 2025,
+          "Financial Market Effects of FOMC Communication," Federal Reserve
+          Bank of San Francisco Working Paper 2025-30), 1994&ndash;present.
+          A few announcements with no rate surprise attached are dropped,
+          as are the six COVID-shock meetings in March&ndash;April 2020,
+          whose moves were extreme outliers.</li>
+        <li><b>Near-zero rates, two ways:</b> "official dates" is simply
+          when the Fed's target rate was at zero. "Market-based" instead
+          looks at how actively short-term rates were being priced, since
+          markets sometimes started expecting a move before -- or kept
+          expecting one after -- the official change.</li>
+      </ul>
+    </section>
+  </section>
+
+  <section class="tab-panel" id="tab-equity">
+    <section class="card">
+      <h2>How stocks react to rate surprises, over time</h2>
+      <p class="card-note">
+        For every 8-year stretch of Fed meetings, how much a surprise move
+        in the 10-year Treasury tends to move the S&amp;P 500. The shaded
+        band shows the margin of error; darker shading marks near-zero-rate
+        periods.
+      </p>
+      <div class="chart-wrap">
+        <div class="chart-scroll"><svg class="chart" id="chart-roll-equity" viewBox="0 0 960 340" preserveAspectRatio="xMidYMid meet"></svg></div>
+        <div class="tooltip" id="tt-roll-equity"></div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--s1)"></span>10-year Treasury coefficient</span>
+        <span><span class="sw" style="background:var(--s1);opacity:0.35"></span>Near-zero rates (official dates)</span>
+        <span><span class="sw" style="background:var(--s1);opacity:0.75"></span>Near-zero rates (market-based)</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Stocks: normal times vs. near-zero rates</h2>
+      <p class="card-note">
+        The same estimate, compared directly for normal times and
+        near-zero-rate periods, using two different ways of drawing that
+        line.
+      </p>
+      <div class="grid2" id="eq-dotcharts"></div>
+    </section>
+
+    <section class="notes">
+      <h2>Notes &amp; sources</h2>
+      <ul>
+        <li class="disclaimer">For informational purposes only. All
+          downloads and calculations are the author's own and may contain
+          errors -- don't rely on this for decisions or conclusions.
+          Verify independently with your own data and calculations before
+          using it for any purpose.</li>
+        <li><b>Data:</b> Fed-meeting surprises from the
+          <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event-Study Database</a>
+          (Acosta, Ajello, Bauer, Loria, and Miranda-Agrippino, 2025,
+          "Financial Market Effects of FOMC Communication," Federal Reserve
+          Bank of San Francisco Working Paper 2025-30), 1994&ndash;present.
+          A few announcements with no rate surprise attached are dropped,
+          as are the six COVID-shock meetings in March&ndash;April 2020,
+          whose moves were extreme outliers.</li>
+        <li><b>Near-zero rates, two ways:</b> "official dates" is simply
+          when the Fed's target rate was at zero. "Market-based" instead
+          looks at how actively short-term rates were being priced, since
+          markets sometimes started expecting a move before -- or kept
+          expecting one after -- the official change.</li>
+        <li><b>Margins of error:</b> the shaded band on the over-time chart
+          shows &plusmn;1 standard error; whiskers on the comparison chart
+          show a wider &plusmn;1.96 (a 95% interval). The comparison chart
+          also notes whether the normal-vs-near-zero gap is likely more
+          than noise (a formal test of whether the two estimates differ).</li>
+        <li><b>Paper this extends:</b> Kiley, M. T. (2014), "The Response
+          of Equity Prices to Movements in Long-Term Interest Rates
+          Associated with Monetary Policy Statements: Before and After the
+          Zero Lower Bound," <i>Journal of Money, Credit and Banking</i>,
+          46(5&ndash;6), 1057&ndash;1071.</li>
+      </ul>
+    </section>
+  </section>
+
+  <section class="tab-panel" id="tab-corporate">
+    <section class="card">
+      <h2>How corporate borrowing costs react, over time</h2>
+      <p class="card-note">
+        Same idea as the stock-market chart: for every 8-year stretch, how
+        much a move in the 20-year Treasury tends to pass through to
+        Moody's Baa and Aaa corporate bond yields.
+      </p>
+      <div class="roll-stack">
+        <div>
+          <div class="chart-sub-label">Baa</div>
+          <div class="chart-wrap">
+            <div class="chart-scroll"><svg class="chart" id="chart-roll-baa" viewBox="0 0 960 300" preserveAspectRatio="xMidYMid meet"></svg></div>
+            <div class="tooltip" id="tt-roll-baa"></div>
+          </div>
+        </div>
+        <div>
+          <div class="chart-sub-label">Aaa</div>
+          <div class="chart-wrap">
+            <div class="chart-scroll"><svg class="chart" id="chart-roll-aaa" viewBox="0 0 960 300" preserveAspectRatio="xMidYMid meet"></svg></div>
+            <div class="tooltip" id="tt-roll-aaa"></div>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--s1)"></span>20-year Treasury coefficient</span>
+        <span><span class="sw" style="background:var(--s1);opacity:0.35"></span>Near-zero rates (official dates)</span>
+        <span><span class="sw" style="background:var(--s1);opacity:0.75"></span>Near-zero rates (market-based)</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Corporate bonds: normal times vs. near-zero rates</h2>
+      <p class="card-note">
+        The same comparison, for normal times and near-zero-rate periods,
+        using two different ways of drawing that line.
+      </p>
+      <div class="grid2" id="corp-dotcharts"></div>
+    </section>
+
+    <section class="notes">
+      <h2>Notes &amp; sources</h2>
+      <ul>
+        <li class="disclaimer">For informational purposes only. All
+          downloads and calculations are the author's own and may contain
+          errors -- don't rely on this for decisions or conclusions.
+          Verify independently with your own data and calculations before
+          using it for any purpose.</li>
+        <li><b>Data:</b> Fed-meeting surprises from the
+          <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event-Study Database</a>
+          (Acosta, Ajello, Bauer, Loria, and Miranda-Agrippino, 2025,
+          "Financial Market Effects of FOMC Communication," Federal Reserve
+          Bank of San Francisco Working Paper 2025-30), 1994&ndash;present.
+          A few announcements with no rate surprise attached are dropped,
+          as are the six COVID-shock meetings in March&ndash;April 2020,
+          whose moves were extreme outliers.</li>
+        <li><b>Corporate &amp; Treasury yields:</b> daily
+          <a href="https://fred.stlouisfed.org/series/DGS10" target="_blank" rel="noopener">10-year</a> and
+          <a href="https://fred.stlouisfed.org/series/DGS20" target="_blank" rel="noopener">20-year</a> Treasury,
+          Moody's <a href="https://fred.stlouisfed.org/series/DAAA" target="_blank" rel="noopener">Aaa</a> and
+          <a href="https://fred.stlouisfed.org/series/DBAA" target="_blank" rel="noopener">Baa</a> corporate
+          yields, from <a href="https://fred.stlouisfed.org/" target="_blank" rel="noopener">FRED</a>
+          (Federal Reserve Bank of St. Louis).</li>
+        <li><b>Near-zero rates, two ways:</b> "official dates" is simply
+          when the Fed's target rate was at zero. "Market-based" instead
+          looks at how actively short-term rates were being priced, since
+          markets sometimes started expecting a move before -- or kept
+          expecting one after -- the official change.</li>
+        <li><b>Why a 20-year Treasury for corporate bonds:</b> following
+          Kiley (2016), whose own check found the 20-year yield explains
+          corporate-bond moves much better than the 10-year does,
+          especially since 2008.</li>
+        <li><b>Margins of error:</b> the shaded bands on the over-time
+          charts show &plusmn;1 standard error; whiskers on the comparison
+          charts show a wider &plusmn;1.96 (a 95% interval). Each
+          comparison chart also notes whether the normal-vs-near-zero gap
+          is likely more than noise (a formal test of whether the two
+          estimates differ).</li>
+        <li><b>Paper this extends:</b> Kiley, M. T. (2016), "Monetary
+          Policy Statements, Treasury Yields, and Private Yields: Before
+          and After the Zero Lower Bound," <i>Finance Research Letters</i>,
+          18, 285&ndash;290.</li>
+      </ul>
+    </section>
+  </section>
+
+  <footer>
+    <span id="foot-run"></span>
+  </footer>
+
+</div>
+
+<script id="data-payload" type="application/json">{"run_date":"20260824","as_of":"2026-07-29","tab1":{"dates":["1994-02-04","1994-03-22","1994-04-18","1994-05-17","1994-07-06","1994-08-16","1994-09-27","1994-11-15","1994-12-20","1995-02-01","1995-03-28","1995-05-23","1995-07-06","1995-08-22","1995-09-26","1995-11-15","1995-12-19","1996-01-31","1996-03-26","1996-05-21","1996-07-03","1996-08-20","1996-09-24","1996-11-13","1996-12-17","1997-02-05","1997-03-25","1997-05-20","1997-07-02","1997-08-19","1997-09-30","1997-11-12","1997-12-16","1998-02-04","1998-03-31","1998-05-19","1998-07-01","1998-08-18","1998-09-29","1998-10-15","1998-11-17","1998-12-22","1999-02-03","1999-03-30","1999-05-18","1999-06-30","1999-08-24","1999-10-05","1999-11-16","1999-12-21","2000-02-02","2000-03-21","2000-05-16","2000-06-28","2000-08-22","2000-10-03","2000-11-15","2000-12-19","2001-01-03","2001-01-31","2001-03-20","2001-04-18","2001-05-15","2001-06-27","2001-08-21","2001-09-17","2001-10-02","2001-11-06","2001-12-11","2002-01-30","2002-03-19","2002-05-07","2002-06-26","2002-08-13","2002-09-24","2002-11-06","2002-12-10","2003-01-29","2003-03-18","2003-05-06","2003-06-25","2003-08-12","2003-09-16","2003-10-28","2003-12-09","2004-01-28","2004-03-16","2004-05-04","2004-06-30","2004-08-10","2004-09-21","2004-11-10","2004-12-14","2005-02-02","2005-03-22","2005-05-03","2005-06-30","2005-08-09","2005-09-20","2005-11-01","2005-12-13","2006-01-31","2006-03-28","2006-05-10","2006-06-29","2006-08-08","2006-09-20","2006-10-25","2006-12-12","2007-01-31","2007-03-21","2007-05-09","2007-06-28","2007-08-07","2007-08-10","2007-08-17","2007-09-18","2007-10-31","2007-12-11","2008-01-22","2008-01-30","2008-03-11","2008-03-18","2008-04-30","2008-06-25","2008-08-05","2008-09-16","2008-10-08","2008-10-29","2008-12-16","2009-01-28","2009-03-18","2009-04-29","2009-06-24","2009-08-12","2009-09-23","2009-11-04","2009-12-16","2010-01-27","2010-03-16","2010-04-28","2010-06-23","2010-08-10","2010-09-21","2010-11-03","2010-12-14","2011-01-26","2011-03-15","2011-04-27","2011-06-22","2011-08-09","2011-09-21","2011-11-02","2011-12-13","2012-01-25","2012-03-13","2012-04-25","2012-06-20","2012-08-01","2012-09-13","2012-10-24","2012-12-12","2013-01-30","2013-03-20","2013-05-01","2013-06-19","2013-07-31","2013-09-18","2013-10-30","2013-12-18","2014-01-29","2014-03-19","2014-04-30","2014-06-18","2014-07-30","2014-09-17","2014-10-29","2014-12-17","2015-01-28","2015-03-18","2015-04-29","2015-06-17","2015-07-29","2015-09-17","2015-10-28","2015-12-16","2016-01-27","2016-03-16","2016-04-27","2016-06-15","2016-07-27","2016-09-21","2016-11-02","2016-12-14","2017-02-01","2017-03-15","2017-05-03","2017-06-14","2017-07-26","2017-09-20","2017-11-01","2017-12-13","2018-01-31","2018-03-21","2018-05-02","2018-06-13","2018-08-01","2018-09-26","2018-11-08","2018-12-19","2019-01-30","2019-03-20","2019-05-01","2019-06-19","2019-07-31","2019-09-18","2019-10-30","2019-12-11","2020-01-29","2020-03-03","2020-03-15","2020-03-19","2020-03-23","2020-03-31","2020-04-29","2020-06-10","2020-07-29","2020-09-16","2020-11-05","2020-12-16","2021-01-27","2021-03-17","2021-04-28","2021-06-16","2021-07-28","2021-09-22","2021-11-03","2021-12-15","2022-01-26","2022-03-16","2022-05-04","2022-06-15","2022-07-27","2022-09-21","2022-11-02","2022-12-14","2023-02-01","2023-03-22","2023-05-03","2023-06-14","2023-07-26","2023-09-20","2023-11-01","2023-12-13","2024-01-31","2024-03-20","2024-05-01","2024-06-12","2024-07-31","2024-09-18","2024-11-07","2024-12-18","2025-01-29","2025-03-19","2025-05-07","2025-06-18","2025-07-30","2025-09-17","2025-10-29","2025-12-10","2026-01-28","2026-03-18","2026-04-29","2026-06-17","2026-07-29"],"ed1":[0.13,-0.05,0.08,-0.04,-0.015,0.08,-0.03,0.04,-0.07,0.06,0.01,-0.01,-0.2,0.055,0.07,0.04,-0.045,-0.025,0.015,0.0,-0.05,-0.03,-0.1,-0.01,-0.015,-0.02,0.04,-0.065,-0.01,-0.0025,0.0,-0.0325,0.005,0.01,0.0025,-0.0275,-0.025,0.0075,0.0575,-0.165,-0.0275,0.01,-0.005,-0.0125,0.0325,-0.08,0.01,0.03,0.0625,0.015,-0.02,-0.005,0.0513,-0.025,-0.0025,0.0225,0.0075,0.035,-0.14,0.03,-0.04,-0.48,-0.11,0.075,-0.0275,0.0,-0.0475,-0.16,-0.02,0.025,-0.06,-0.015,0.015,-0.0225,-0.0025,-0.0825,0.005,0.0325,0.01,-0.03,0.115,-0.005,0.0,-0.0225,-0.005,0.0275,-0.025,-0.005,-0.04,0.035,-0.015,-0.005,-0.0075,-0.005,0.03,0.01,0.045,-0.005,0.035,0.005,-0.0025,0.03,0.035,0.035,-0.05,-0.035,0.015,-0.005,-0.005,0.0,-0.05,0.005,0.005,-0.005,0.01,-0.0575,-0.18,0.015,0.185,-0.13,-0.145,0.035,0.05,-0.06,-0.065,-0.025,0.14,0.02,0.0,-0.26,0.0,-0.05,0.0,0.01,0.0,-0.05,-0.015,-0.005,-0.005,-0.015,-0.01,0.005,-0.01,0.0,0.005,0.005,-0.005,0.0,-0.015,-0.005,0.025,0.055,0.005,0.0025,-0.0025,0.0025,0.0,0.015,0.01,0.005,0.0,-0.0025,0.0,0.0,-0.005,0.01,0.0,-0.015,0.0,0.01,0.0,0.02,0.01,-0.02,0.0,0.0,0.0,-0.01,-0.005,-0.05,0.01,-0.045,-0.005,-0.07,0.02,0.015,-0.02,-0.075,0.005,-0.035,0.005,-0.02,0.005,0.0,-0.015,-0.0425,0.015,0.01,-0.005,0.04,0.0,-0.005,0.0,-0.02,-0.005,-0.0025,0.0,0.005,0.005,0.02,-0.01,0.0,0.0,-0.11,0.05,0.07,0.01,0.0025,0.0,-0.18,-0.1637,-0.06,-0.045,-0.02,0.005,-0.0025,0.0,0.0,0.0,-0.005,0.005,-0.01,-0.005,0.01,-0.005,0.005,-0.0025,0.02,0.08,0.02,-0.095,-0.12,-0.055,0.06,0.0,0.0,-0.04,-0.04,0.005,-0.01,-0.015,0.03,-0.035,-0.0125,0.045,-0.045,-0.01,0.0075,-0.02,-0.08,0.005,0.06,0.015,-0.035,0.0,-0.01,0.055,-0.03,0.11,-0.0125,0.005,0.03,0.0,0.15,-0.12],"ust10y":[0.074,-0.066,0.084,-0.1,0.018,-0.036,0.021,-0.01,0.009,0.031,0.016,0.002,-0.134,0.026,0.032,0.016,-0.008,-0.028,0.023,0.022,-0.026,0.015,-0.06,-0.015,0.015,0.0175,0.044,-0.004,-0.008,0.017,0.008,-0.021,-0.004,0.0,0.004,-0.002,-0.02,-0.002,-0.019,-0.1425,-0.012,0.0,0.012,-0.004,0.099,-0.077,-0.016,0.055,0.039,0.042,0.0295,-0.004,0.0217,-0.0128,-0.0083,0.0254,-0.0085,0.0223,0.0159,0.0082,-0.0139,-0.1638,-0.0276,0.0063,-0.0497,0.0245,0.003,-0.0248,-0.031,-0.0078,-0.0454,-0.0165,0.0091,-0.07,-0.0268,-0.0548,0.0149,0.0414,-0.0157,-0.0517,0.028,-0.0284,-0.0156,-0.0888,0.0784,0.0975,-0.0672,0.0184,0.0138,0.0251,-0.034,-0.029,-0.017,-0.023,0.107,0.014,0.015,-0.023,-0.019,0.004,-0.02,0.032,0.043,0.04,-0.008,0.0,0.0119,-0.0181,-0.0313,-0.0133,-0.0473,0.0218,0.0104,-0.0143,-0.0119,0.0196,0.003,0.0469,-0.0745,0.0826,0.0168,0.0905,-0.0223,-0.0019,-0.0217,0.0137,0.0526,0.0497,-0.0419,-0.0839,0.0172,-0.4343,0.0716,0.0971,0.0257,-0.0764,0.0246,0.0324,0.0271,-0.019,0.0135,-0.0018,-0.0622,-0.0072,0.067,0.0155,0.0148,0.022,0.0037,0.0474,-0.0242,-0.0499,-0.0176,-0.0156,-0.0247,0.0352,0.0079,-0.0307,0.0255,0.0121,-0.0018,0.0482,-0.0108,0.0087,0.0153,0.1162,-0.0342,-0.1858,0.0434,0.0074,-0.0146,0.067,0.0064,-0.0181,-0.0182,0.05,0.0215,0.0261,-0.0204,-0.1168,-0.0018,-0.0773,-0.0144,-0.0581,0.0178,0.0036,-0.021,-0.0585,-0.0018,-0.0085,-0.012,-0.0434,0.0035,0.0879,-0.0074,-0.0708,0.018,0.0303,-0.0161,0.0407,0.0082,-0.0214,0.0169,-0.0036,-0.0112,0.0312,-0.0056,-0.0187,0.0074,-0.0589,-0.034,-0.0519,0.0305,-0.0587,-0.0052,0.053,-0.0264,-0.0156,-0.024,-0.0829,-0.3297,-0.0229,-0.0886,0.0016,0.0095,-0.0346,-0.0147,0.0196,0.0017,0.0017,0.0111,-0.0335,-0.0302,0.0746,-0.0084,0.0051,0.0263,0.0204,0.0607,-0.008,-0.0527,-0.0842,0.0073,-0.0529,0.0708,-0.02,-0.0751,-0.0584,0.0038,0.0408,-0.0296,0.03,-0.0442,-0.1157,0.0227,-0.0079,-0.0248,0.0544,-0.0328,0.0169,-0.0253,0.1051,-0.007,-0.0685,-0.012,0.012,0.014,0.007,0.05,-0.027,-0.01,0.031,0.012,0.059,0.022],"era_bands":[{"start":"2009-01-28","end":"2015-10-28"},{"start":"2020-03-19","end":"2022-01-26"}],"era_ratio_bands":[{"start":"2009-01-28","end":"2009-11-04"},{"start":"2010-09-21","end":"2014-10-29"},{"start":"2020-04-29","end":"2021-11-03"}],"scatter_2y_10y":{"dates":["1994-02-04","1994-03-22","1994-04-18","1994-05-17","1994-07-06","1994-08-16","1994-09-27","1994-11-15","1994-12-20","1995-02-01","1995-03-28","1995-05-23","1995-07-06","1995-08-22","1995-09-26","1995-11-15","1995-12-19","1996-01-31","1996-03-26","1996-05-21","1996-07-03","1996-08-20","1996-09-24","1996-11-13","1996-12-17","1997-02-05","1997-03-25","1997-05-20","1997-07-02","1997-08-19","1997-09-30","1997-11-12","1997-12-16","1998-02-04","1998-03-31","1998-05-19","1998-07-01","1998-08-18","1998-09-29","1998-10-15","1998-11-17","1998-12-22","1999-02-03","1999-03-30","1999-05-18","1999-06-30","1999-08-24","1999-10-05","1999-11-16","1999-12-21","2000-02-02","2000-03-21","2000-05-16","2000-06-28","2000-08-22","2000-10-03","2000-11-15","2000-12-19","2001-01-03","2001-01-31","2001-03-20","2001-04-18","2001-05-15","2001-06-27","2001-08-21","2001-09-17","2001-10-02","2001-11-06","2001-12-11","2002-01-30","2002-03-19","2002-05-07","2002-06-26","2002-08-13","2002-09-24","2002-11-06","2002-12-10","2003-01-29","2003-03-18","2003-05-06","2003-06-25","2003-08-12","2003-09-16","2003-10-28","2003-12-09","2004-01-28","2004-03-16","2004-05-04","2004-06-30","2004-08-10","2004-09-21","2004-11-10","2004-12-14","2005-02-02","2005-03-22","2005-05-03","2005-06-30","2005-08-09","2005-09-20","2005-11-01","2005-12-13","2006-01-31","2006-03-28","2006-05-10","2006-06-29","2006-08-08","2006-09-20","2006-10-25","2006-12-12","2007-01-31","2007-03-21","2007-05-09","2007-06-28","2007-08-07","2007-08-10","2007-08-17","2007-09-18","2007-10-31","2007-12-11","2008-01-22","2008-01-30","2008-03-11","2008-03-18","2008-04-30","2008-06-25","2008-08-05","2008-09-16","2008-10-08","2008-10-29","2008-12-16","2009-01-28","2009-03-18","2009-04-29","2009-06-24","2009-08-12","2009-09-23","2009-11-04","2009-12-16","2010-01-27","2010-03-16","2010-04-28","2010-06-23","2010-08-10","2010-09-21","2010-11-03","2010-12-14","2011-01-26","2011-03-15","2011-04-27","2011-06-22","2011-08-09","2011-09-21","2011-11-02","2011-12-13","2012-01-25","2012-03-13","2012-04-25","2012-06-20","2012-08-01","2012-09-13","2012-10-24","2012-12-12","2013-01-30","2013-03-20","2013-05-01","2013-06-19","2013-07-31","2013-09-18","2013-10-30","2013-12-18","2014-01-29","2014-03-19","2014-04-30","2014-06-18","2014-07-30","2014-09-17","2014-10-29","2014-12-17","2015-01-28","2015-03-18","2015-04-29","2015-06-17","2015-07-29","2015-09-17","2015-10-28","2015-12-16","2016-01-27","2016-03-16","2016-04-27","2016-06-15","2016-07-27","2016-09-21","2016-11-02","2016-12-14","2017-02-01","2017-03-15","2017-05-03","2017-06-14","2017-07-26","2017-09-20","2017-11-01","2017-12-13","2018-01-31","2018-03-21","2018-05-02","2018-06-13","2018-08-01","2018-09-26","2018-11-08","2018-12-19","2019-01-30","2019-03-20","2019-05-01","2019-06-19","2019-07-31","2019-09-18","2019-10-30","2019-12-11","2020-01-29","2020-03-03","2020-03-15","2020-03-19","2020-03-23","2020-03-31","2020-04-29","2020-06-10","2020-07-29","2020-09-16","2020-11-05","2020-12-16","2021-01-27","2021-03-17","2021-04-28","2021-06-16","2021-07-28","2021-09-22","2021-11-03","2021-12-15","2022-01-26","2022-03-16","2022-05-04","2022-06-15","2022-07-27","2022-09-21","2022-11-02","2022-12-14","2023-02-01","2023-03-22","2023-05-03","2023-06-14","2023-07-26","2023-09-20","2023-11-01","2023-12-13","2024-01-31","2024-03-20","2024-05-01","2024-06-12","2024-07-31","2024-09-18","2024-11-07","2024-12-18","2025-01-29","2025-03-19","2025-05-07","2025-06-18","2025-07-30","2025-09-17","2025-10-29","2025-12-10","2026-01-28","2026-03-18","2026-04-29","2026-06-17","2026-07-29"],"x":[0.142,-0.052,0.125,-0.06,0.004,0.044,-0.009,0.04,-0.009,0.064,0.009,0.0,-0.19,0.035,0.039,0.03,-0.017,-0.004,0.006,0.01,0.006,0.009,-0.0105,-0.019,0.003,0.0,0.0435,-0.035,-0.016,-0.017,0.0,-0.051,-0.017,0.0085,0.0,-0.0085,-0.05,0.0,0.033,-0.216,0.0,0.0255,0.0,-0.017,0.121,-0.109,-0.018,0.051,0.086,0.044,0.034,0.017,0.0828,-0.0043,0.0174,0.0465,0.0,0.0256,-0.0042,0.0124,-0.0295,-0.3343,-0.1349,0.0595,-0.0968,-0.032,-0.0122,-0.0829,-0.0618,0.0081,-0.0696,-0.0337,0.0125,-0.0916,-0.0021,-0.0471,0.0243,0.0458,-0.0061,-0.0982,0.0697,-0.0448,-0.0082,-0.1142,0.0446,0.1654,-0.0713,0.008,-0.0122,0.0325,-0.008,-0.037,-0.008,-0.008,0.072,0.032,0.061,-0.021,0.025,0.012,-0.025,0.037,0.049,0.063,-0.046,-0.029,0.0255,-0.0042,-0.0463,-0.0083,-0.0849,0.0462,0.0167,-0.0417,0.0042,0.0126,-0.1307,0.0782,-0.1235,0.0204,-0.0443,0.1695,0.0243,-0.0162,-0.0689,-0.0162,0.077,0.0399,-0.0358,-0.1264,-0.0079,-0.0689,0.0237,0.0516,-0.0041,-0.087,-0.0318,0.0081,0.0534,-0.0405,-0.0039,-0.004,-0.0159,-0.004,-0.0118,-0.0161,-0.0276,0.0281,-0.0277,0.0202,-0.0952,0.0444,0.0079,0.0,-0.0156,0.008,-0.0078,0.0202,0.0196,0.014,0.0,0.004,-0.0058,0.0,0.0039,0.0403,-0.0079,-0.0524,0.0058,-0.0236,-0.0039,0.0769,0.0039,0.0,-0.0079,0.0363,0.0394,0.0,-0.0163,-0.1234,0.0,-0.0808,-0.0119,-0.0849,0.0595,0.0284,-0.0337,-0.1216,0.0119,-0.0442,0.004,-0.0325,0.004,0.0974,-0.0239,-0.0773,0.018,0.0487,-0.0159,0.0533,0.0039,-0.0346,0.0081,-0.0289,-0.0161,0.0329,0.0,-0.0122,0.0042,-0.0228,-0.0645,-0.0496,0.0564,-0.133,0.0741,0.0925,-0.012,-0.0243,-0.0238,-0.1265,-0.2027,-0.026,-0.0241,-0.002,-0.0019,-0.0119,-0.0039,-0.002,-0.004,-0.002,-0.0019,-0.0181,-0.0098,0.034,-0.001,0.0202,-0.006,0.0121,0.1052,0.0513,-0.151,-0.1321,-0.0792,0.0415,0.0707,0.0585,-0.1144,-0.1534,-0.0392,0.1146,-0.0602,0.0791,-0.076,-0.1992,0.0205,-0.0595,-0.0646,0.0609,-0.0702,-0.0335,0.0021,0.1289,0.007,-0.103,-0.014,0.0,0.054,-0.013,0.081,-0.054,-0.002,0.043,0.023,0.14,-0.084],"y":[0.074,-0.066,0.084,-0.1,0.018,-0.036,0.021,-0.01,0.009,0.031,0.016,0.002,-0.134,0.026,0.032,0.016,-0.008,-0.028,0.023,0.022,-0.026,0.015,-0.06,-0.015,0.015,0.0175,0.044,-0.004,-0.008,0.017,0.008,-0.021,-0.004,0.0,0.004,-0.002,-0.02,-0.002,-0.019,-0.1425,-0.012,0.0,0.012,-0.004,0.099,-0.077,-0.016,0.055,0.039,0.042,0.0295,-0.004,0.0217,-0.0128,-0.0083,0.0254,-0.0085,0.0223,0.0159,0.0082,-0.0139,-0.1638,-0.0276,0.0063,-0.0497,0.0245,0.003,-0.0248,-0.031,-0.0078,-0.0454,-0.0165,0.0091,-0.07,-0.0268,-0.0548,0.0149,0.0414,-0.0157,-0.0517,0.028,-0.0284,-0.0156,-0.0888,0.0784,0.0975,-0.0672,0.0184,0.0138,0.0251,-0.034,-0.029,-0.017,-0.023,0.107,0.014,0.015,-0.023,-0.019,0.004,-0.02,0.032,0.043,0.04,-0.008,0.0,0.0119,-0.0181,-0.0313,-0.0133,-0.0473,0.0218,0.0104,-0.0143,-0.0119,0.0196,0.003,0.0469,-0.0745,0.0826,0.0168,0.0905,-0.0223,-0.0019,-0.0217,0.0137,0.0526,0.0497,-0.0419,-0.0839,0.0172,-0.4343,0.0716,0.0971,0.0257,-0.0764,0.0246,0.0324,0.0271,-0.019,0.0135,-0.0018,-0.0622,-0.0072,0.067,0.0155,0.0148,0.022,0.0037,0.0474,-0.0242,-0.0499,-0.0176,-0.0156,-0.0247,0.0352,0.0079,-0.0307,0.0255,0.0121,-0.0018,0.0482,-0.0108,0.0087,0.0153,0.1162,-0.0342,-0.1858,0.0434,0.0074,-0.0146,0.067,0.0064,-0.0181,-0.0182,0.05,0.0215,0.0261,-0.0204,-0.1168,-0.0018,-0.0773,-0.0144,-0.0581,0.0178,0.0036,-0.021,-0.0585,-0.0018,-0.0085,-0.012,-0.0434,0.0035,0.0879,-0.0074,-0.0708,0.018,0.0303,-0.0161,0.0407,0.0082,-0.0214,0.0169,-0.0036,-0.0112,0.0312,-0.0056,-0.0187,0.0074,-0.0589,-0.034,-0.0519,0.0305,-0.0587,-0.0052,0.053,-0.0264,-0.0156,-0.024,-0.0829,-0.3297,-0.0229,-0.0886,0.0016,0.0095,-0.0346,-0.0147,0.0196,0.0017,0.0017,0.0111,-0.0335,-0.0302,0.0746,-0.0084,0.0051,0.0263,0.0204,0.0607,-0.008,-0.0527,-0.0842,0.0073,-0.0529,0.0708,-0.02,-0.0751,-0.0584,0.0038,0.0408,-0.0296,0.03,-0.0442,-0.1157,0.0227,-0.0079,-0.0248,0.0544,-0.0328,0.0169,-0.0253,0.1051,-0.007,-0.0685,-0.012,0.012,0.014,0.007,0.05,-0.027,-0.01,0.031,0.012,0.059,0.022],"group":["non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era"],"is_recent":[false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,true,true,true,true,true,true,true]},"scatter_2y_bei5y":{"dates":["2005-02-02","2005-03-22","2005-05-03","2005-06-30","2005-08-09","2005-09-20","2005-11-01","2005-12-13","2006-01-31","2006-03-28","2006-05-10","2006-06-29","2006-08-08","2006-09-20","2006-10-25","2006-12-12","2007-01-31","2007-03-21","2007-05-09","2007-06-28","2007-08-07","2007-08-10","2007-08-17","2007-09-18","2007-10-31","2007-12-11","2008-01-22","2008-01-30","2008-03-11","2008-03-18","2008-04-30","2008-06-25","2008-08-05","2008-09-16","2008-10-08","2008-10-29","2008-12-16","2009-01-28","2009-03-18","2009-04-29","2009-06-24","2009-08-12","2009-09-23","2009-11-04","2009-12-16","2010-01-27","2010-03-16","2010-04-28","2010-06-23","2010-08-10","2010-09-21","2010-11-03","2010-12-14","2011-01-26","2011-03-15","2011-04-27","2011-06-22","2011-08-09","2011-09-21","2011-11-02","2011-12-13","2012-01-25","2012-03-13","2012-04-25","2012-06-20","2012-08-01","2012-09-13","2012-10-24","2012-12-12","2013-01-30","2013-03-20","2013-05-01","2013-06-19","2013-07-31","2013-09-18","2013-10-30","2013-12-18","2014-01-29","2014-03-19","2014-04-30","2014-06-18","2014-07-30","2014-09-17","2014-10-29","2014-12-17","2015-01-28","2015-03-18","2015-04-29","2015-06-17","2015-07-29","2015-09-17","2015-10-28","2015-12-16","2016-01-27","2016-03-16","2016-04-27","2016-06-15","2016-07-27","2016-09-21","2016-11-02","2016-12-14","2017-02-01","2017-03-15","2017-05-03","2017-06-14","2017-07-26","2017-09-20","2017-11-01","2017-12-13","2018-01-31","2018-03-21","2018-05-02","2018-06-13","2018-08-01","2018-09-26","2018-11-08","2018-12-19","2019-01-30","2019-03-20","2019-05-01","2019-06-19","2019-07-31","2019-09-18","2019-10-30","2019-12-11","2020-01-29","2020-03-03","2020-03-15","2020-03-19","2020-03-23","2020-03-31","2020-04-29","2020-06-10","2020-07-29","2020-09-16","2020-11-05","2020-12-16","2021-01-27","2021-03-17","2021-04-28","2021-06-16","2021-07-28","2021-09-22","2021-11-03","2021-12-15","2022-01-26","2022-03-16","2022-05-04","2022-06-15","2022-07-27","2022-09-21","2022-11-02","2022-12-14","2023-02-01","2023-03-22","2023-05-03","2023-06-14","2023-07-26","2023-09-20","2023-11-01","2023-12-13","2024-01-31","2024-03-20","2024-05-01","2024-06-12","2024-07-31","2024-09-18","2024-11-07","2024-12-18","2025-01-29","2025-03-19","2025-05-07","2025-06-18","2025-07-30","2025-09-17","2025-10-29","2025-12-10","2026-01-28","2026-03-18","2026-04-29","2026-06-17","2026-07-29"],"x":[-0.008,0.072,0.032,0.061,-0.021,0.025,0.012,-0.025,0.037,0.049,0.063,-0.046,-0.029,0.0255,-0.0042,-0.0463,-0.0083,-0.0849,0.0462,0.0167,-0.0417,0.0042,0.0126,-0.1307,0.0782,-0.1235,0.0204,-0.0443,0.1695,0.0243,-0.0162,-0.0689,-0.0162,0.077,0.0399,-0.0358,-0.1264,-0.0079,-0.0689,0.0237,0.0516,-0.0041,-0.087,-0.0318,0.0081,0.0534,-0.0405,-0.0039,-0.004,-0.0159,-0.004,-0.0118,-0.0161,-0.0276,0.0281,-0.0277,0.0202,-0.0952,0.0444,0.0079,0.0,-0.0156,0.008,-0.0078,0.0202,0.0196,0.014,0.0,0.004,-0.0058,0.0,0.0039,0.0403,-0.0079,-0.0524,0.0058,-0.0236,-0.0039,0.0769,0.0039,0.0,-0.0079,0.0363,0.0394,0.0,-0.0163,-0.1234,0.0,-0.0808,-0.0119,-0.0849,0.0595,0.0284,-0.0337,-0.1216,0.0119,-0.0442,0.004,-0.0325,0.004,0.0974,-0.0239,-0.0773,0.018,0.0487,-0.0159,0.0533,0.0039,-0.0346,0.0081,-0.0289,-0.0161,0.0329,0.0,-0.0122,0.0042,-0.0228,-0.0645,-0.0496,0.0564,-0.133,0.0741,0.0925,-0.012,-0.0243,-0.0238,-0.1265,-0.2027,-0.026,-0.0241,-0.002,-0.0019,-0.0119,-0.0039,-0.002,-0.004,-0.002,-0.0019,-0.0181,-0.0098,0.034,-0.001,0.0202,-0.006,0.0121,0.1052,0.0513,-0.151,-0.1321,-0.0792,0.0415,0.0707,0.0585,-0.1144,-0.1534,-0.0392,0.1146,-0.0602,0.0791,-0.076,-0.1992,0.0205,-0.0595,-0.0646,0.0609,-0.0702,-0.0335,0.0021,0.1289,0.007,-0.103,-0.014,0.0,0.054,-0.013,0.081,-0.054,-0.002,0.043,0.023,0.14,-0.084],"y":[0.0049,0.0345,0.0108,0.0115,0.0021,0.0094,0.0015,-0.0093,-0.0018,0.0017,0.012,0.0045,0.0172,0.0033,0.0003,0.0009,0.0051,-0.0034,-0.0068,0.0002,-0.0084,0.0002,-0.0038,0.0415,-0.0076,-0.0404,0.0284,0.0293,0.0009,-0.0025,0.0013,-0.0048,-0.0052,0.0014,0.0106,-0.0186,0.0017,-0.0103,-0.0699,-0.0229,0.0203,0.0084,-0.0453,0.0192,-0.0102,-0.013,-0.0069,-0.002,0.0015,-0.0026,-0.0078,0.0005,-0.0177,-0.0048,0.0249,0.022,-0.0151,-0.0529,0.0012,0.0145,-0.0051,0.0501,0.0169,0.0127,-0.0222,0.0028,0.0915,-0.0033,0.0161,0.0011,0.0,0.0021,-0.0261,0.0044,0.0606,0.0102,-0.0093,-0.0047,-0.0255,0.005,-0.0023,0.0002,-0.0096,-0.0532,-0.0301,-0.0098,0.0584,0.0038,0.0262,0.0024,0.0483,-0.0125,-0.0147,-0.0121,0.0357,0.0101,0.0402,0.0045,0.0013,-0.0004,-0.0168,0.0079,0.0135,0.002,-0.0115,0.005,-0.0128,0.001,-0.0045,0.0021,0.0054,0.0034,-0.0006,-0.0024,-0.0062,-0.0001,-0.0475,0.0394,0.0357,0.003,0.0396,-0.0207,-0.0169,-0.0288,0.0139,-0.0033,0.0214,-0.1701,0.004,-0.0066,0.0084,0.0006,0.017,-0.0024,0.0106,-0.0156,-0.0088,0.0145,-0.0165,-0.0022,-0.0987,0.0476,-0.0197,0.0133,0.0691,-0.0471,-0.0158,0.0921,0.0608,0.0506,-0.02,0.0222,-0.0127,0.0425,0.0304,0.0109,-0.002,-0.0041,-0.0153,0.0141,0.0367,0.0199,0.0321,0.0236,-0.0104,0.0096,0.0085,-0.0125,-0.0092,-0.0083,0.0203,-0.0277,0.0168,-0.0128,0.0047,-0.0097,0.0029,0.0034,-0.0106,-0.01,-0.0431,0.0404],"group":["non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era","non_zlb_era"],"is_recent":[false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,false,true,true,true,true,true,true,true,true]}},"tab2":{"static":[{"grouping":"era","group":"non_zlb_era","n":183,"coef":-9.805,"se":1.411,"cd_f":1113.3,"af_p":0.139},{"grouping":"era","group":"zlb_era","n":69,"coef":-6.346,"se":1.863,"cd_f":161.8,"af_p":0.139},{"grouping":"era_ratio","group":"non_zlb_era","n":199,"coef":-10.002,"se":1.338,"cd_f":1242.8,"af_p":0.001},{"grouping":"era_ratio","group":"zlb_era","n":53,"coef":-4.77,"se":0.887,"cd_f":158.2,"af_p":0.001}],"roll_dates":["2003-06-25","2003-08-12","2003-09-16","2003-10-28","2003-12-09","2004-01-28","2004-03-16","2004-05-04","2004-06-30","2004-08-10","2004-09-21","2004-11-10","2004-12-14","2005-02-02","2005-03-22","2005-05-03","2005-06-30","2005-08-09","2005-09-20","2005-11-01","2005-12-13","2006-01-31","2006-03-28","2006-05-10","2006-06-29","2006-08-08","2006-09-20","2006-10-25","2006-12-12","2007-01-31","2007-03-21","2007-05-09","2007-06-28","2007-08-07","2007-08-10","2007-08-17","2007-09-18","2007-10-31","2007-12-11","2008-01-22","2008-01-30","2008-03-11","2008-03-18","2008-04-30","2008-06-25","2008-08-05","2008-09-16","2008-10-08","2008-10-29","2008-12-16","2009-01-28","2009-03-18","2009-04-29","2009-06-24","2009-08-12","2009-09-23","2009-11-04","2009-12-16","2010-01-27","2010-03-16","2010-04-28","2010-05-09","2010-06-23","2010-08-10","2010-09-21","2010-11-03","2010-12-14","2011-01-26","2011-03-15","2011-04-27","2011-06-22","2011-08-09","2011-09-21","2011-11-02","2011-12-13","2012-01-25","2012-03-13","2012-04-25","2012-06-20","2012-08-01","2012-09-13","2012-10-24","2012-12-12","2013-01-30","2013-03-20","2013-05-01","2013-06-19","2013-07-31","2013-09-18","2013-10-30","2013-12-18","2014-01-29","2014-03-19","2014-04-30","2014-06-18","2014-07-30","2014-09-17","2014-10-29","2014-12-17","2015-01-28","2015-03-18","2015-04-29","2015-06-17","2015-07-29","2015-09-17","2015-10-28","2015-12-16","2016-01-27","2016-03-16","2016-04-27","2016-06-15","2016-07-27","2016-09-21","2016-11-02","2016-12-14","2017-02-01","2017-03-15","2017-05-03","2017-06-14","2017-07-26","2017-09-20","2017-11-01","2017-12-13","2018-01-31","2018-03-21","2018-05-02","2018-06-13","2018-08-01","2018-09-26","2018-11-08","2018-12-19","2019-01-30","2019-03-20","2019-05-01","2019-06-19","2019-07-31","2019-09-18","2019-10-04","2019-10-30","2019-12-11","2020-01-29","2020-06-10","2020-07-29","2020-08-27","2020-09-16","2020-11-05","2020-12-16","2021-01-27","2021-03-17","2021-04-28","2021-06-16","2021-07-28","2021-09-22","2021-11-03","2021-12-15","2022-01-26","2022-03-16","2022-05-04","2022-06-15","2022-07-27","2022-09-21","2022-11-02","2022-12-14","2023-02-01","2023-03-22","2023-05-03","2023-06-14","2023-07-26","2023-09-20","2023-11-01","2023-12-13","2024-01-31","2024-03-20","2024-05-01","2024-06-12","2024-07-31","2024-09-18","2024-11-07","2024-12-18","2025-01-29","2025-03-19","2025-05-07","2025-06-18","2025-07-30","2025-09-17","2025-10-29","2025-12-10","2026-01-28","2026-03-18","2026-04-29","2026-06-17","2026-07-29"],"roll_coef":[-9.902,-9.862,-9.937,-9.497,-9.176,-9.161,-8.843,-8.726,-8.696,-8.681,-8.662,-8.609,-8.613,-8.599,-8.284,-8.321,-8.385,-8.381,-8.433,-8.406,-8.284,-8.286,-8.257,-7.12,-7.175,-7.172,-7.203,-7.213,-6.83,-6.113,-6.346,-6.198,-6.209,-6.363,-6.372,-6.43,-7.045,-7.012,-5.807,-5.536,-5.539,-4.419,-5.516,-5.46,-5.563,-1.455,-1.438,-1.777,-2.455,-3.499,-3.521,-4.136,-3.778,-3.842,-3.949,-4.104,-4.083,-4.266,-4.266,-4.505,-4.482,-4.54,-4.553,-4.637,-4.634,-4.777,-4.784,-5.01,-5.059,-4.787,-4.919,-4.601,-4.711,-4.667,-4.665,-4.776,-4.755,-4.755,-4.872,-4.905,-4.6,-4.593,-4.528,-4.536,-4.491,-4.432,-4.356,-4.289,-4.45,-4.48,-4.481,-4.479,-4.764,-4.75,-4.527,-4.524,-4.377,-4.595,-4.554,-4.518,-4.626,-4.518,-5.648,-5.776,-5.329,-6.242,-5.936,-5.846,-6.095,-6.085,-5.868,-5.586,-5.743,-5.463,-5.59,-6.807,-7.111,-7.065,-7.093,-7.281,-7.188,-7.197,-7.201,-7.23,-7.184,-7.194,-7.217,-7.185,-7.169,-7.009,-6.617,-6.795,-6.914,-6.884,-6.757,-7.556,-6.57,-6.529,-6.574,-6.5,-6.467,-6.474,-6.411,-6.397,-6.901,-6.9,-6.941,-7.106,-7.213,-7.227,-7.078,-7.109,-7.152,-6.956,-6.457,-8.22,-7.92,-9.895,-10.275,-10.734,-11.559,-12.211,-12.728,-13.278,-12.309,-12.355,-12.238,-12.126,-13.151,-12.983,-12.397,-12.612,-12.771,-12.993,-12.723,-12.567,-12.512,-12.558,-13.612,-13.584,-13.77,-13.84,-13.945,-14.137,-14.428,-13.977,-14.119,-14.154,-14.15,-14.094,-14.214,-14.578],"roll_se":[2.454,2.462,2.471,2.534,2.498,2.339,2.492,2.498,2.494,2.487,2.533,2.547,2.549,2.553,2.439,2.409,2.39,2.38,2.375,2.371,2.408,2.387,2.339,2.71,2.697,2.698,2.697,2.691,2.911,3.164,3.051,3.145,3.202,3.245,3.285,3.275,3.177,3.114,3.44,3.428,3.391,3.469,3.284,3.27,3.221,2.195,2.177,2.192,2.121,2.175,2.173,1.297,1.33,1.289,1.295,1.251,1.247,1.255,1.244,1.244,1.241,1.249,1.246,1.27,1.271,1.312,1.314,1.399,1.43,1.451,1.501,1.502,1.574,1.575,1.589,1.603,1.598,1.6,1.722,1.725,1.69,1.698,1.672,1.672,1.677,1.68,1.597,1.608,1.447,1.441,1.428,1.431,1.457,1.459,1.472,1.474,1.453,1.459,1.449,1.441,1.421,1.437,1.409,1.446,1.362,1.416,1.361,1.344,1.364,1.362,1.352,1.305,1.32,1.329,1.302,1.719,1.603,1.704,1.685,1.804,1.755,1.762,1.771,1.776,1.779,1.781,1.762,1.797,1.798,1.794,1.878,1.834,1.795,1.78,1.668,1.629,1.657,1.658,1.641,1.653,1.669,1.669,1.679,1.688,1.601,1.601,1.622,1.628,1.611,1.61,1.715,1.715,2.108,2.128,2.239,2.575,2.736,3.106,2.822,2.825,2.887,2.82,2.854,2.732,3.041,3.05,3.122,3.101,3.051,2.996,2.668,2.638,2.761,2.753,2.674,2.648,2.682,2.686,2.616,2.619,2.597,2.607,2.633,2.618,2.659,2.551,2.547,2.554,2.518,2.515,2.386,2.419]},"tab3":{"static":[{"model":"baa_20yr","grouping":"era","group":"non_zlb_era","n":200,"coef":0.902,"se":0.08,"cd_f":49.2,"af_p":0.025},{"model":"baa_20yr","grouping":"era","group":"zlb_era","n":69,"coef":0.681,"se":0.057,"cd_f":26.2,"af_p":0.025},{"model":"baa_20yr","grouping":"era_ratio","group":"non_zlb_era","n":216,"coef":0.882,"se":0.075,"cd_f":54.8,"af_p":0.028},{"model":"baa_20yr","grouping":"era_ratio","group":"zlb_era","n":53,"coef":0.665,"se":0.064,"cd_f":21.1,"af_p":0.028},{"model":"aaa_20yr","grouping":"era","group":"non_zlb_era","n":200,"coef":0.933,"se":0.081,"cd_f":49.2,"af_p":0.071},{"model":"aaa_20yr","grouping":"era","group":"zlb_era","n":69,"coef":0.743,"se":0.067,"cd_f":26.2,"af_p":0.071},{"model":"aaa_20yr","grouping":"era_ratio","group":"non_zlb_era","n":216,"coef":0.936,"se":0.076,"cd_f":54.8,"af_p":0.01},{"model":"aaa_20yr","grouping":"era_ratio","group":"zlb_era","n":53,"coef":0.663,"se":0.073,"cd_f":21.1,"af_p":0.01}],"roll_dates":["2001-06-27","2001-08-21","2001-09-17","2001-10-02","2001-11-06","2001-12-11","2002-01-30","2002-03-19","2002-05-07","2002-06-26","2002-08-13","2002-09-24","2002-11-06","2002-12-10","2003-01-29","2003-03-18","2003-05-06","2003-06-25","2003-08-12","2003-09-16","2003-10-28","2003-12-09","2004-01-28","2004-03-16","2004-05-04","2004-06-30","2004-08-10","2004-09-21","2004-11-10","2004-12-14","2005-02-02","2005-03-22","2005-05-03","2005-06-30","2005-08-09","2005-09-20","2005-11-01","2005-12-13","2006-01-31","2006-03-28","2006-05-10","2006-06-29","2006-08-08","2006-09-20","2006-10-25","2006-12-12","2007-01-31","2007-03-21","2007-05-09","2007-06-28","2007-08-07","2007-08-10","2007-08-17","2007-09-18","2007-10-31","2007-12-11","2008-01-22","2008-01-30","2008-03-11","2008-03-18","2008-04-30","2008-06-25","2008-08-05","2008-09-16","2008-10-08","2008-10-29","2008-12-16","2009-01-28","2009-03-18","2009-04-29","2009-06-24","2009-08-12","2009-09-23","2009-11-04","2009-12-16","2010-01-27","2010-03-16","2010-04-28","2010-06-23","2010-08-10","2010-09-21","2010-11-03","2010-12-14","2011-01-26","2011-03-15","2011-04-27","2011-06-22","2011-08-09","2011-09-21","2011-11-02","2011-12-13","2012-01-25","2012-03-13","2012-04-25","2012-06-20","2012-08-01","2012-09-13","2012-10-24","2012-12-12","2013-01-30","2013-03-20","2013-05-01","2013-06-19","2013-07-31","2013-09-18","2013-10-30","2013-12-18","2014-01-29","2014-03-19","2014-04-30","2014-06-18","2014-07-30","2014-09-17","2014-10-29","2014-12-17","2015-01-28","2015-03-18","2015-04-29","2015-06-17","2015-07-29","2015-09-17","2015-10-28","2015-12-16","2016-01-27","2016-03-16","2016-04-27","2016-06-15","2016-07-27","2016-09-21","2016-11-02","2016-12-14","2017-02-01","2017-03-15","2017-05-03","2017-06-14","2017-07-26","2017-09-20","2017-11-01","2017-12-13","2018-01-31","2018-03-21","2018-05-02","2018-06-13","2018-08-01","2018-09-26","2018-11-08","2018-12-19","2019-01-30","2019-03-20","2019-05-01","2019-06-19","2019-07-31","2019-09-18","2019-10-04","2019-10-30","2019-12-11","2020-01-29","2020-06-10","2020-07-29","2020-08-27","2020-09-16","2020-11-05","2020-12-16","2021-01-27","2021-03-17","2021-04-28","2021-06-16","2021-07-28","2021-09-22","2021-11-03","2021-12-15","2022-01-26","2022-03-16","2022-05-04","2022-06-15","2022-07-27","2022-09-21","2022-11-02","2022-12-14","2023-02-01","2023-03-22","2023-05-03","2023-06-14","2023-07-26","2023-09-20","2023-11-01","2023-12-13","2024-01-31","2024-03-20","2024-05-01","2024-06-12","2024-07-31","2024-09-18","2024-11-07","2024-12-18","2025-01-29","2025-03-19","2025-05-07","2025-06-18","2025-07-30","2025-09-17","2025-10-29","2025-12-10","2026-01-28","2026-03-18","2026-04-29","2026-06-17","2026-07-29"],"roll_baa_coef":[0.866,0.909,0.914,0.928,0.853,0.853,0.857,0.827,0.844,0.859,0.875,0.882,0.886,0.97,0.917,0.894,0.887,0.86,0.853,0.844,0.866,0.894,0.875,0.894,0.903,0.907,0.919,0.907,0.895,0.895,0.896,0.892,0.897,0.893,0.897,0.891,0.894,0.891,0.897,0.892,0.914,0.91,0.916,0.917,0.917,0.839,0.859,0.868,0.877,0.95,0.954,0.956,0.957,0.999,1.009,0.989,1.028,1.029,1.039,1.089,1.109,1.132,0.955,1.018,1.02,1.049,1.055,1.049,0.895,0.88,0.876,0.888,0.897,0.894,0.9,0.9,0.901,0.901,0.911,0.899,0.893,0.901,0.903,0.903,0.904,0.901,0.912,0.89,0.892,0.893,0.889,0.886,0.89,0.89,0.89,0.895,0.893,0.896,0.893,0.895,0.894,0.894,0.892,0.892,0.891,0.888,0.888,0.889,0.887,0.887,0.887,0.885,0.887,0.877,0.872,0.873,0.869,0.86,0.858,0.86,0.869,0.866,0.847,0.851,0.845,0.835,0.835,0.804,0.794,0.793,0.706,0.702,0.747,0.746,0.713,0.705,0.655,0.667,0.683,0.679,0.655,0.653,0.653,0.675,0.675,0.69,0.686,0.696,0.694,0.693,0.709,0.717,0.715,0.718,0.717,0.721,0.711,0.705,0.706,0.7,0.694,0.69,0.687,0.688,0.671,0.674,0.64,0.637,0.587,0.59,0.604,0.546,0.451,0.474,0.497,0.503,0.474,0.456,0.44,0.538,0.527,0.509,0.462,0.473,0.403,0.412,0.613,0.624,0.623,0.643,0.611,0.6,0.595,0.589,0.709,0.712,0.698,0.718,0.74,0.744,0.743,0.753,0.746,0.75,0.754,0.759,0.746,0.76],"roll_baa_se":[0.166,0.186,0.199,0.246,0.312,0.304,0.288,0.3,0.293,0.308,0.305,0.32,0.314,0.506,0.489,0.488,0.458,0.392,0.394,0.39,0.36,0.344,0.279,0.273,0.268,0.274,0.275,0.275,0.279,0.278,0.278,0.247,0.25,0.259,0.259,0.256,0.257,0.257,0.265,0.242,0.229,0.228,0.235,0.236,0.237,0.215,0.241,0.238,0.256,0.263,0.266,0.258,0.251,0.259,0.236,0.199,0.216,0.217,0.185,0.201,0.2,0.202,0.084,0.105,0.092,0.098,0.086,0.082,0.105,0.101,0.097,0.1,0.104,0.102,0.108,0.109,0.11,0.109,0.112,0.106,0.105,0.109,0.11,0.11,0.116,0.115,0.126,0.115,0.118,0.118,0.117,0.115,0.115,0.115,0.116,0.122,0.121,0.119,0.117,0.117,0.116,0.118,0.11,0.112,0.1,0.1,0.1,0.099,0.097,0.099,0.099,0.1,0.101,0.1,0.097,0.096,0.088,0.082,0.084,0.092,0.092,0.09,0.09,0.092,0.09,0.089,0.088,0.077,0.079,0.079,0.05,0.051,0.084,0.086,0.106,0.108,0.115,0.109,0.104,0.105,0.115,0.115,0.113,0.105,0.105,0.096,0.095,0.091,0.086,0.083,0.077,0.081,0.083,0.083,0.083,0.081,0.085,0.086,0.086,0.091,0.091,0.091,0.094,0.093,0.102,0.101,0.118,0.12,0.163,0.163,0.153,0.155,0.195,0.193,0.151,0.146,0.162,0.156,0.163,0.154,0.17,0.173,0.181,0.176,0.208,0.195,0.199,0.201,0.202,0.193,0.209,0.205,0.215,0.214,0.19,0.187,0.198,0.197,0.186,0.176,0.184,0.161,0.163,0.162,0.155,0.151,0.145,0.154],"roll_aaa_coef":[0.928,0.995,1.005,1.003,0.95,1.088,1.075,1.055,1.062,1.079,1.09,1.102,1.09,1.342,1.203,1.174,1.133,1.119,1.11,1.097,1.09,1.138,1.082,1.037,1.046,1.049,1.059,1.043,1.049,1.049,1.057,1.041,1.049,1.053,1.054,1.054,1.055,1.054,1.068,1.056,1.055,1.047,1.052,1.055,1.055,0.963,1.01,1.012,0.996,1.006,1.003,0.995,0.989,0.982,1.001,0.964,1.009,1.008,1.081,1.146,1.156,1.182,1.074,1.148,1.125,1.136,1.096,1.091,0.927,0.85,0.85,0.859,0.862,0.861,0.862,0.858,0.859,0.859,0.879,0.869,0.86,0.86,0.862,0.862,0.857,0.847,0.852,0.859,0.862,0.864,0.864,0.856,0.847,0.846,0.847,0.851,0.853,0.858,0.854,0.855,0.855,0.854,0.846,0.846,0.85,0.845,0.845,0.846,0.838,0.837,0.836,0.832,0.837,0.829,0.822,0.823,0.825,0.824,0.835,0.849,0.874,0.88,0.838,0.838,0.819,0.804,0.808,0.783,0.783,0.785,0.742,0.739,0.762,0.791,0.753,0.749,0.699,0.702,0.719,0.725,0.703,0.704,0.696,0.714,0.715,0.692,0.691,0.696,0.696,0.686,0.675,0.681,0.624,0.614,0.607,0.617,0.616,0.606,0.607,0.602,0.576,0.571,0.551,0.541,0.519,0.521,0.427,0.426,0.358,0.348,0.408,0.464,0.385,0.457,0.634,0.665,0.662,0.634,0.636,0.7,0.713,0.7,0.636,0.636,0.556,0.529,0.65,0.685,0.71,0.73,0.665,0.655,0.646,0.637,0.732,0.735,0.721,0.739,0.771,0.777,0.781,0.79,0.79,0.792,0.785,0.792,0.794,0.815],"roll_aaa_se":[0.143,0.158,0.169,0.209,0.263,0.321,0.299,0.305,0.299,0.315,0.309,0.325,0.314,0.502,0.482,0.478,0.444,0.379,0.379,0.374,0.344,0.334,0.269,0.272,0.266,0.272,0.273,0.271,0.273,0.273,0.273,0.24,0.244,0.253,0.253,0.251,0.251,0.25,0.26,0.236,0.228,0.226,0.231,0.233,0.233,0.201,0.225,0.222,0.237,0.246,0.25,0.241,0.233,0.237,0.219,0.191,0.212,0.215,0.199,0.208,0.204,0.209,0.183,0.199,0.175,0.182,0.151,0.146,0.127,0.095,0.092,0.093,0.094,0.093,0.096,0.095,0.095,0.094,0.097,0.093,0.09,0.091,0.092,0.091,0.094,0.092,0.1,0.098,0.099,0.098,0.098,0.095,0.091,0.091,0.092,0.097,0.097,0.096,0.094,0.094,0.094,0.094,0.087,0.089,0.082,0.081,0.081,0.081,0.078,0.079,0.079,0.079,0.079,0.079,0.076,0.076,0.071,0.068,0.075,0.085,0.09,0.089,0.078,0.079,0.077,0.075,0.075,0.067,0.071,0.071,0.074,0.075,0.13,0.124,0.148,0.151,0.154,0.15,0.147,0.148,0.155,0.154,0.15,0.149,0.147,0.141,0.138,0.135,0.129,0.125,0.118,0.133,0.13,0.129,0.131,0.128,0.132,0.133,0.133,0.137,0.139,0.139,0.146,0.147,0.157,0.156,0.196,0.196,0.269,0.271,0.253,0.214,0.263,0.254,0.223,0.215,0.232,0.224,0.233,0.197,0.216,0.222,0.227,0.224,0.26,0.249,0.195,0.19,0.179,0.171,0.2,0.196,0.205,0.205,0.178,0.175,0.188,0.187,0.173,0.163,0.17,0.148,0.148,0.148,0.143,0.139,0.13,0.137]},"tab_expectations":{"current_date":"2026-08-21","previous_date":"2026-07-01","through":"2027-12-31","contract_3mo":"DEC26","contract_dec_ny":"DEC27","ff_path_current":[{"start":"2026-08-01","rate":3.63},{"start":"2026-09-01","rate":3.675},{"start":"2026-10-01","rate":3.735},{"start":"2026-11-01","rate":3.785},{"start":"2026-12-01","rate":3.86},{"start":"2027-01-01","rate":3.89},{"start":"2027-02-01","rate":3.935},{"start":"2027-03-01","rate":3.97},{"start":"2027-04-01","rate":4.005},{"start":"2027-05-01","rate":4.035},{"start":"2027-06-01","rate":4.06},{"start":"2027-07-01","rate":4.07},{"start":"2027-08-01","rate":4.075},{"start":"2027-09-01","rate":4.075},{"start":"2027-10-01","rate":4.075},{"start":"2027-11-01","rate":4.07},{"start":"2027-12-01","rate":4.055}],"ff_path_previous":[{"start":"2026-06-01","rate":3.625},{"start":"2026-07-01","rate":3.6325},{"start":"2026-08-01","rate":3.7},{"start":"2026-09-01","rate":3.76},{"start":"2026-10-01","rate":3.83},{"start":"2026-11-01","rate":3.885},{"start":"2026-12-01","rate":3.955},{"start":"2027-01-01","rate":3.985},{"start":"2027-02-01","rate":4.015},{"start":"2027-03-01","rate":4.035},{"start":"2027-04-01","rate":4.06},{"start":"2027-05-01","rate":4.065},{"start":"2027-06-01","rate":4.05},{"start":"2027-07-01","rate":4.04},{"start":"2027-08-01","rate":4.01},{"start":"2027-09-01","rate":3.995},{"start":"2027-10-01","rate":3.97},{"start":"2027-11-01","rate":3.94},{"start":"2027-12-01","rate":3.92}],"pdf_3mo_current":{"rates":[3.375,3.625,3.875,4.125,4.375,4.625,4.875,5.125],"probs":[0.0,31.812,27.502,17.728,14.775,3.459,1.238,0.575],"bucket":0.25},"pdf_3mo_previous":{"rates":[2.875,3.125,3.375,3.625,3.875,4.125,4.375,4.625,4.875,5.125],"probs":[0.266,2.547,0.357,22.397,14.551,25.151,17.769,9.55,3.034,0.762],"bucket":0.25},"pdf_dec_ny_current":{"rates":[0.75,1.25,1.75,2.25,2.75,3.25,3.75,4.25,4.75,5.25,5.75,6.25,6.75,7.25,7.75],"probs":[0.0,1.429,0.811,3.29,4.86,11.166,22.968,26.003,11.975,5.411,4.37,1.064,0.76,1.753,0.0],"bucket":0.5},"pdf_dec_ny_previous":{"rates":[0.25,0.75,1.25,1.75,2.25,2.75,3.25,3.75,4.25,4.75,5.25,5.75,6.25,6.75,7.25,7.75,8.25],"probs":[1.142,1.759,1.19,2.294,3.986,5.005,15.265,27.354,16.387,11.157,5.295,3.471,1.608,1.638,0.224,1.537,0.0],"bucket":0.5},"effr_dates":["2026-07-21","2026-07-22","2026-07-23","2026-07-24","2026-07-25","2026-07-26","2026-07-27","2026-07-28","2026-07-29","2026-07-30","2026-07-31","2026-08-01","2026-08-02","2026-08-03","2026-08-04","2026-08-05","2026-08-06","2026-08-07","2026-08-08","2026-08-09","2026-08-10","2026-08-11","2026-08-12","2026-08-13","2026-08-14","2026-08-15","2026-08-16","2026-08-17","2026-08-18","2026-08-19","2026-08-20"],"effr_rate":[3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63,3.63]}}</script>
+<script>
+const DATA = JSON.parse(document.getElementById('data-payload').textContent);
+
+document.getElementById('meta-asof').textContent = 'Data as of ' + DATA.as_of;
+document.getElementById('foot-run').textContent = 'Run ' + DATA.run_date;
+
+// ---- tabs ----
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    // the bar chart's scroll width can only be measured once its tab-panel
+    // is actually visible (display:none reports 0) -- so default it to the
+    // right edge (most recent events) here, on reveal, not at page load
+    if (btn.dataset.tab === 'tab-surprises') {
+      const barsScroll = document.getElementById('chart-bars').closest('.chart-scroll');
+      if (barsScroll) barsScroll.scrollLeft = barsScroll.scrollWidth;
+    }
+  });
+});
+
+// ---- shared helpers ----
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function fmtDate(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+}
+function fmtDateShort(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { year: '2-digit', month: 'short', day: 'numeric' });
+}
+function fmtDateFull(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+// plain-language readout of the Andrews-Fair p-value on a dot-whisker chart
+function sigNote(p) {
+  return (p < 0.05 ? 'Gap looks real' : 'Gap could be noise') + ` (p=${p.toFixed(3)})`;
+}
+const MONTH_NAMES_FULL = {
+  JAN: 'January', FEB: 'February', MAR: 'March', APR: 'April', MAY: 'May', JUN: 'June',
+  JUL: 'July', AUG: 'August', SEP: 'September', OCT: 'October', NOV: 'November', DEC: 'December',
+};
+// CME contract code ('DEC26') -> plain month/year ('December 2026')
+function fmtContract(c) {
+  return `${MONTH_NAMES_FULL[c.slice(0, 3)]} 20${c.slice(3)}`;
+}
+
+// generic time-series line chart, one or two series sharing one y-scale,
+// optional shaded regime bands, optional confidence band around series[0]
+function renderTimeChart(svg, tooltip, dates, series, opts) {
+  opts = opts || {};
+  const W = 960, H = svg.viewBox.baseVal.height || 340;
+  const padL = 46, padR = 16, padT = 16, padB = 30;
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const n = dates.length;
+  if (n === 0) return;
+
+  let allVals = [];
+  series.forEach(s => s.values.forEach(v => { if (v !== null && !isNaN(v)) allVals.push(v); }));
+  if (opts.band) {
+    opts.band.upper.forEach(v => { if (v !== null) allVals.push(v); });
+    opts.band.lower.forEach(v => { if (v !== null) allVals.push(v); });
+  }
+  let rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+  if (opts.includeZero !== false) { rawMin = Math.min(rawMin, 0); rawMax = Math.max(rawMax, 0); }
+  const { ticks: tickVals, niceMin, niceMax, decimals: niceDecimals } = niceTicks(rawMin, rawMax, 5);
+  const vMin = niceMin, vMax = niceMax;
+
+  const x = i => padL + (i / (n - 1)) * (W - padL - padR);
+  const y = v => padT + (1 - (v - vMin) / (vMax - vMin)) * (H - padT - padB);
+
+  // ZLB bands (behind everything) -- same two-layer treatment as the Tab 1
+  // bar chart: outer pale = strict-date era, inner solid = activity-based.
+  (opts.outerBands || []).forEach(b => {
+    let i0 = dates.findIndex(d => d >= b.start);
+    let i1 = dates.findIndex(d => d >= b.end);
+    if (i0 === -1) return;
+    if (i1 === -1) i1 = n - 1;
+    svg.appendChild(el('rect', { x: x(i0), y: padT, width: Math.max(x(i1) - x(i0), 1), height: H - padT - padB, fill: 'var(--s1)', opacity: 0.14 }));
+  });
+  (opts.innerBands || []).forEach(b => {
+    let i0 = dates.findIndex(d => d >= b.start);
+    let i1 = dates.findIndex(d => d >= b.end);
+    if (i0 === -1) return;
+    if (i1 === -1) i1 = n - 1;
+    svg.appendChild(el('rect', { x: x(i0), y: padT, width: Math.max(x(i1) - x(i0), 1), height: H - padT - padB, fill: 'var(--s1)', opacity: 0.30 }));
+  });
+
+  // y gridlines + labels -- "nice" round units, always including zero
+  tickVals.forEach(v => {
+    const yy = y(v);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yy, y2: yy, class: 'grid-line' }));
+    const lbl = el('text', { x: padL - 8, y: yy + 3, class: 'axis-label', 'text-anchor': 'end' });
+    lbl.textContent = v.toFixed(opts.decimals !== undefined ? opts.decimals : niceDecimals);
+    svg.appendChild(lbl);
+  });
+  if (vMin < 0 && vMax > 0) {
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: y(0), y2: y(0), class: 'zero-line' }));
+  }
+
+  // x labels (a handful, evenly spaced)
+  const nXLabels = 6;
+  for (let t = 0; t <= nXLabels; t++) {
+    const i = Math.round((t / nXLabels) * (n - 1));
+    const anchor = t === 0 ? 'start' : (t === nXLabels ? 'end' : 'middle');
+    const lbl = el('text', { x: x(i), y: H - padB + 16, class: 'axis-label', 'text-anchor': anchor });
+    lbl.textContent = fmtDate(dates[i]);
+    svg.appendChild(lbl);
+  }
+
+  // confidence band
+  if (opts.band) {
+    let d = '';
+    for (let i = 0; i < n; i++) {
+      if (opts.band.upper[i] === null) continue;
+      d += (d ? 'L' : 'M') + x(i) + ',' + y(opts.band.upper[i]) + ' ';
+    }
+    for (let i = n - 1; i >= 0; i--) {
+      if (opts.band.lower[i] === null) continue;
+      d += 'L' + x(i) + ',' + y(opts.band.lower[i]) + ' ';
+    }
+    svg.appendChild(el('path', { d: d + 'Z', fill: series[0].color, class: 'band', stroke: 'none' }));
+  }
+
+  // series lines
+  series.forEach(s => {
+    let d = '';
+    for (let i = 0; i < n; i++) {
+      if (s.values[i] === null || isNaN(s.values[i])) { d += ''; continue; }
+      d += (d === '' || s.values[i - 1] === null ? 'M' : 'L') + x(i) + ',' + y(s.values[i]) + ' ';
+    }
+    svg.appendChild(el('path', { d, class: 'series-path', stroke: s.color }));
+  });
+
+  // hover
+  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, opacity: 0 });
+  svg.appendChild(hoverLine);
+  const dots = series.map(s => { const c = el('circle', { r: 3.5, fill: s.color, opacity: 0 }); svg.appendChild(c); return c; });
+  const overlay = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' });
+  svg.appendChild(overlay);
+
+  overlay.addEventListener('mousemove', (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (W / rect.width);
+    let i = Math.round(((px - padL) / (W - padL - padR)) * (n - 1));
+    i = Math.max(0, Math.min(n - 1, i));
+    hoverLine.setAttribute('x1', x(i)); hoverLine.setAttribute('x2', x(i)); hoverLine.setAttribute('opacity', 1);
+    let lines = [fmtDateShort(dates[i])];
+    series.forEach((s, k) => {
+      const v = s.values[i];
+      dots[k].setAttribute('opacity', v === null ? 0 : 1);
+      if (v !== null) { dots[k].setAttribute('cx', x(i)); dots[k].setAttribute('cy', y(v)); lines.push(s.name + ': ' + v.toFixed(opts.tooltipDecimals || 2)); }
+    });
+    tooltip.innerHTML = lines.join('<br>');
+    tooltip.style.opacity = 1;
+    const tx = rect.left + (x(i) / W) * rect.width + window.scrollX;
+    const ty = rect.top + (y(series[0].values[i] ?? 0) / H) * rect.height + window.scrollY;
+    tooltip.style.left = (tx + 12) + 'px';
+    tooltip.style.top = (ty - 36) + 'px';
+  });
+  overlay.addEventListener('mouseleave', () => {
+    tooltip.style.opacity = 0; hoverLine.setAttribute('opacity', 0);
+    dots.forEach(d => d.setAttribute('opacity', 0));
+  });
+}
+
+// small dot-and-whisker comparison chart: categories on x, coefficient on y
+function renderDotWhisker(container, title, note, points) {
+  // points: [{label, coef, se, color}]
+  const W = 360, H = 230, padL = 46, padR = 16, padT = 16, padB = 40;
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'chart');
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const wrap = document.createElement('div');
+  const h3 = document.createElement('div');
+  h3.style.fontFamily = "'Public Sans', sans-serif";
+  h3.style.fontWeight = '600';
+  h3.style.fontSize = '0.88rem';
+  h3.style.marginBottom = '0.15rem';
+  h3.textContent = title;
+  wrap.appendChild(h3);
+  if (note) {
+    const p = document.createElement('div');
+    p.style.fontSize = '0.76rem'; p.style.color = 'var(--ink-faint)'; p.style.marginBottom = '0.4rem';
+    p.textContent = note;
+    wrap.appendChild(p);
+  }
+  wrap.appendChild(svg);
+
+  const lo = Math.min(...points.map(p => p.coef - 1.96 * p.se));
+  const hi = Math.max(...points.map(p => p.coef + 1.96 * p.se));
+  let vMin = Math.min(lo, 0), vMax = Math.max(hi, 0);
+  const pad = (vMax - vMin) * 0.15 || 0.1;
+  vMin -= pad; vMax += pad;
+  const y = v => padT + (1 - (v - vMin) / (vMax - vMin)) * (H - padT - padB);
+  const n = points.length;
+  const x = i => padL + ((i + 0.5) / n) * (W - padL - padR);
+
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const v = vMin + (t / ticks) * (vMax - vMin);
+    const yy = y(v);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yy, y2: yy, class: 'grid-line' }));
+    const lbl = el('text', { x: padL - 8, y: yy + 3, class: 'axis-label', 'text-anchor': 'end' });
+    lbl.textContent = v.toFixed(2);
+    svg.appendChild(lbl);
+  }
+  if (vMin < 0 && vMax > 0) svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: y(0), y2: y(0), class: 'zero-line' }));
+
+  points.forEach((p, i) => {
+    const cx = x(i);
+    svg.appendChild(el('line', { x1: cx, x2: cx, y1: y(p.coef - 1.96 * p.se), y2: y(p.coef + 1.96 * p.se), stroke: p.color, 'stroke-width': 2 }));
+    svg.appendChild(el('circle', { cx, cy: y(p.coef), r: 5, fill: p.color }));
+    const lbl = el('text', { x: cx, y: H - padB + 16, class: 'axis-label', 'text-anchor': 'middle' });
+    lbl.textContent = p.label;
+    svg.appendChild(lbl);
+    const labelText = p.coef.toFixed(2);
+    const labelY = y(p.coef) - 12;
+    // background patch so the whisker line (which can extend well past this
+    // offset when SE is large) renders behind the label, not through it
+    svg.appendChild(el('rect', {
+      x: cx - (labelText.length * 3.4 + 3), y: labelY - 9,
+      width: labelText.length * 6.8 + 6, height: 13,
+      fill: 'var(--surface)',
+    }));
+    const vlbl = el('text', {
+      x: cx, y: labelY, class: 'axis-label', 'text-anchor': 'middle',
+      fill: p.color, 'font-size': '11px', 'font-weight': '600',
+    });
+    vlbl.textContent = labelText;
+    svg.appendChild(vlbl);
+  });
+  container.appendChild(wrap);
+}
+
+function percentile(sorted, p) {
+  const idx = (sorted.length - 1) * p;
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+}
+
+// "nice numbers" axis ticks (Heckbert): snaps the step to 1/2/5 x 10^k so
+// labels read as round units and the range always lands on a tick at zero
+// (niceMin/niceMax are multiples of step, and step always divides zero).
+function niceNum(range, round) {
+  const exponent = Math.floor(Math.log10(range));
+  const fraction = range / Math.pow(10, exponent);
+  let niceFraction;
+  if (round) {
+    niceFraction = fraction < 1.5 ? 1 : fraction < 3 ? 2 : fraction < 7 ? 5 : 10;
+  } else {
+    niceFraction = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+  }
+  return niceFraction * Math.pow(10, exponent);
+}
+function niceTicks(min, max, targetCount) {
+  if (min === max) { min -= 1; max += 1; }
+  const range = niceNum(max - min, false);
+  const step = niceNum(range / (targetCount - 1), true);
+  const niceMin = Math.floor(min / step) * step;
+  const niceMax = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = niceMin; v <= niceMax + step * 0.5; v += step) ticks.push(Math.round(v / step) * step);
+  const decimals = step >= 1 ? 0 : step >= 0.1 ? 1 : step >= 0.01 ? 2 : 3;
+  return { ticks, niceMin, niceMax, step, decimals };
+}
+
+// step-after line chart on a true calendar-time x-axis (not evenly-spaced
+// by index): each series holds its value flat from one point to the next,
+// then jumps -- right for a futures curve, where each point is the implied
+// rate for an entire contract month, not an instant to slope toward.
+// series: [{name, color, dashed, points:[{t:'YYYY-MM-DD', v}], extend}]
+// (extend: hold the last value flat out to tMax, for a forward curve whose
+// last priced contract is still short of the chart's right edge)
+function renderStepChart(svg, tooltip, series, opts) {
+  opts = opts || {};
+  const W = 960, H = svg.viewBox.baseVal.height || 340;
+  const padL = 46, padR = 16, padT = 16, padB = 30;
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const toT = s => new Date(s + 'T00:00:00').getTime();
+
+  const allPts = series.flatMap(s => s.points);
+  if (allPts.length === 0) return;
+  const tMin = toT(opts.tMin);
+  const tMax = toT(opts.tMax);
+
+  let rawMin = Math.min(...allPts.map(p => p.v)), rawMax = Math.max(...allPts.map(p => p.v));
+  if (opts.includeZero !== false) { rawMin = Math.min(rawMin, 0); rawMax = Math.max(rawMax, 0); }
+  const { ticks: tickVals, niceMin, niceMax, decimals } = niceTicks(rawMin, rawMax, 5);
+  const vMin = niceMin, vMax = niceMax;
+
+  const x = t => padL + ((t - tMin) / (tMax - tMin)) * (W - padL - padR);
+  const y = v => padT + (1 - (v - vMin) / (vMax - vMin)) * (H - padT - padB);
+
+  tickVals.forEach(v => {
+    const yy = y(v);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yy, y2: yy, class: 'grid-line' }));
+    const lbl = el('text', { x: padL - 8, y: yy + 3, class: 'axis-label', 'text-anchor': 'end' });
+    lbl.textContent = v.toFixed(decimals);
+    svg.appendChild(lbl);
+  });
+  if (vMin < 0 && vMax > 0) svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: y(0), y2: y(0), class: 'zero-line' }));
+
+  if (opts.todayLine) {
+    const tx = x(toT(opts.todayLine));
+    svg.appendChild(el('line', { x1: tx, x2: tx, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, 'stroke-dasharray': '2,2' }));
+    const lbl = el('text', { x: tx, y: padT + 10, class: 'axis-label', 'text-anchor': 'middle' });
+    lbl.textContent = opts.todayLabel || 'today';
+    svg.appendChild(lbl);
+  }
+
+  const nXLabels = 6;
+  for (let t = 0; t <= nXLabels; t++) {
+    const tt = tMin + (t / nXLabels) * (tMax - tMin);
+    const anchor = t === 0 ? 'start' : (t === nXLabels ? 'end' : 'middle');
+    const lbl = el('text', { x: x(tt), y: H - padB + 16, class: 'axis-label', 'text-anchor': anchor });
+    lbl.textContent = fmtDate(new Date(tt).toISOString().slice(0, 10));
+    svg.appendChild(lbl);
+  }
+
+  series.forEach(s => {
+    const pts = s.points;
+    if (!pts.length) return;
+    let d = `M${x(toT(pts[0].t))},${y(pts[0].v)} `;
+    for (let i = 1; i < pts.length; i++) {
+      d += `L${x(toT(pts[i].t))},${y(pts[i - 1].v)} L${x(toT(pts[i].t))},${y(pts[i].v)} `;
+    }
+    if (s.extend) d += `L${x(tMax)},${y(pts[pts.length - 1].v)} `;
+    svg.appendChild(el('path', {
+      d, fill: 'none', stroke: s.color, 'stroke-width': 2,
+      'stroke-dasharray': s.dashed ? '6,3' : 'none',
+    }));
+  });
+
+  // hover: step-function value of each series at the cursor's time
+  const valueAt = (pts, t) => {
+    if (!pts.length || t < toT(pts[0].t)) return null;
+    let v = pts[0].v;
+    for (const p of pts) { if (toT(p.t) > t) break; v = p.v; }
+    return v;
+  };
+  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, opacity: 0 });
+  svg.appendChild(hoverLine);
+  const overlay = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' });
+  svg.appendChild(overlay);
+  overlay.addEventListener('mousemove', (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (W / rect.width);
+    const t = tMin + Math.max(0, Math.min(1, (px - padL) / (W - padL - padR))) * (tMax - tMin);
+    hoverLine.setAttribute('x1', x(t)); hoverLine.setAttribute('x2', x(t)); hoverLine.setAttribute('opacity', 1);
+    const lines = [fmtDate(new Date(t).toISOString().slice(0, 10))];
+    series.forEach(s => {
+      const v = valueAt(s.points, t);
+      if (v !== null) lines.push(`${s.name}: ${v.toFixed(opts.tooltipDecimals !== undefined ? opts.tooltipDecimals : 2)}%`);
+    });
+    tooltip.innerHTML = lines.join('<br>');
+    tooltip.style.opacity = 1;
+    tooltip.style.left = (rect.left + (x(t) / W) * rect.width + 12 + window.scrollX) + 'px';
+    tooltip.style.top = (rect.top + 20 + window.scrollY) + 'px';
+  });
+  overlay.addEventListener('mouseleave', () => { tooltip.style.opacity = 0; hoverLine.setAttribute('opacity', 0); });
+}
+
+// bucketed probability-distribution bar chart for one contract: current
+// date as a filled bar, previous date as a thick dashed outline drawn on
+// top of it (never underneath -- draw order matters here, since a dashed
+// outline shorter than the filled bar behind it would otherwise vanish).
+function renderProbBars(svg, tooltip, curPdf, prevPdf, curLabel, prevLabel) {
+  const W = 960, H = svg.viewBox.baseVal.height || 300;
+  const padL = 46, padR = 16, padT = 16, padB = 30;
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const bsz = (curPdf && curPdf.bucket) || (prevPdf && prevPdf.bucket) || 0.25;
+  const curMap = new Map((curPdf ? curPdf.rates : []).map((r, i) => [r.toFixed(3), curPdf.probs[i]]));
+  const prevMap = new Map((prevPdf ? prevPdf.rates : []).map((r, i) => [r.toFixed(3), prevPdf.probs[i]]));
+  const rates = Array.from(new Set([...curMap.keys(), ...prevMap.keys()])).map(Number).sort((a, b) => a - b);
+  if (!rates.length) {
+    svg.appendChild(el('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', class: 'axis-label' })).textContent = 'No data';
+    return;
+  }
+  const rMin = rates[0] - bsz, rMax = rates[rates.length - 1] + bsz;
+  const allProbs = rates.flatMap(r => [curMap.get(r.toFixed(3)) || 0, prevMap.get(r.toFixed(3)) || 0]);
+  const vMax = Math.max(...allProbs, 1) * 1.15;
+
+  const x = r => padL + (r - rMin) / (rMax - rMin) * (W - padL - padR);
+  const y = p => padT + (1 - p / vMax) * (H - padT - padB);
+  const barW = Math.max((x(rMin + bsz) - x(rMin)) * 0.78, 3);
+  const yBase = H - padB;
+
+  const { ticks: tickVals, decimals } = niceTicks(0, vMax, 5);
+  tickVals.forEach(v => {
+    const yy = y(v);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yy, y2: yy, class: 'grid-line' }));
+    const lbl = el('text', { x: padL - 8, y: yy + 3, class: 'axis-label', 'text-anchor': 'end' });
+    lbl.textContent = v.toFixed(decimals) + '%';
+    svg.appendChild(lbl);
+  });
+  svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yBase, y2: yBase, class: 'zero-line' }));
+
+  const step = Math.max(1, Math.ceil(rates.length / 12));
+  rates.forEach((r, i) => {
+    if (i % step !== 0) return;
+    const lbl = el('text', { x: x(r), y: H - padB + 16, class: 'axis-label', 'text-anchor': 'middle' });
+    lbl.textContent = r.toFixed(2);
+    svg.appendChild(lbl);
+  });
+
+  // light-fill (current) bars first, then a bold dark dashed outline
+  // (previous) on top -- max contrast between the two: a pale bar reads
+  // as background-ish, so the dark dashed edge is the thing the eye lands
+  // on for the comparison date, never washed out by a competing fill color
+  rates.forEach(r => {
+    const cp = curMap.get(r.toFixed(3)) || 0;
+    if (cp <= 0.01) return;
+    svg.appendChild(el('rect', {
+      x: x(r) - barW / 2, y: y(cp), width: barW, height: Math.max(yBase - y(cp), 0.5),
+      fill: 'var(--s1)', opacity: 0.45,
+    }));
+  });
+  rates.forEach(r => {
+    const pp = prevMap.get(r.toFixed(3)) || 0;
+    if (pp <= 0.01) return;
+    svg.appendChild(el('rect', {
+      x: x(r) - barW / 2, y: y(pp), width: barW, height: Math.max(yBase - y(pp), 0.5),
+      fill: 'none', stroke: 'var(--ink)', 'stroke-width': 3, 'stroke-dasharray': '6,3',
+    }));
+  });
+
+  const overlay = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' });
+  svg.appendChild(overlay);
+  overlay.addEventListener('mousemove', (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (W / rect.width);
+    const r = rMin + ((px - padL) / (W - padL - padR)) * (rMax - rMin);
+    const bucketed = Math.round(r / bsz) * bsz;
+    const cp = curMap.get(bucketed.toFixed(3)) || 0, pp = prevMap.get(bucketed.toFixed(3)) || 0;
+    if (cp <= 0.01 && pp <= 0.01) { tooltip.style.opacity = 0; return; }
+    tooltip.innerHTML = `Rate: ${bucketed.toFixed(2)}%<br>${curLabel}: ${cp.toFixed(1)}%<br>${prevLabel}: ${pp.toFixed(1)}%`;
+    tooltip.style.opacity = 1;
+    tooltip.style.left = (rect.left + (x(bucketed) / W) * rect.width + 12 + window.scrollX) + 'px';
+    tooltip.style.top = (rect.top + 20 + window.scrollY) + 'px';
+  });
+  overlay.addEventListener('mouseleave', () => { tooltip.style.opacity = 0; });
+}
+
+// paired-bar time series: two series as bars per event, plus two layers of
+// shaded bands (outer = pale, inner = solid). Width scales with the number
+// of events so bars stay legible; wrap in an overflow-x:auto container.
+// Y-scale is set from a high percentile of |values|, not the true max, so
+// a handful of crisis-era outliers don't compress everything else to
+// hairlines -- outliers are simply capped at the plot boundary (hover still
+// shows the true value).
+function renderBarChart(svg, tooltip, dates, series, opts) {
+  opts = opts || {};
+  const n = dates.length;
+  if (n === 0) return;
+  const W = Math.max(960, n * 7), H = svg.viewBox.baseVal.height || 340;
+  const padL = 50, padR = 16, padT = 16, padB = 30;
+  svg.innerHTML = '';
+  svg.style.width = W + 'px';   // explicit pixel width so it overflows the
+  svg.style.maxWidth = 'none';  // scrollable container instead of being
+                                 // squashed to 100% by the shared chart CSS
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  let allAbs = [];
+  series.forEach(s => s.values.forEach(v => allAbs.push(Math.abs(v))));
+  allAbs.sort((a, b) => a - b);
+  let vMax = percentile(allAbs, 0.97) * 1.25;
+  if (vMax <= 0) vMax = Math.max(...allAbs) || 1;
+  const vMin = -vMax;
+
+  const slot = (W - padL - padR) / n;
+  const x = i => padL + i * slot;
+  const yRaw = v => padT + (1 - (v - vMin) / (vMax - vMin)) * (H - padT - padB);
+  const y = v => Math.min(Math.max(yRaw(v), padT), H - padB); // clip to plot area
+  const yZero = y(0);
+
+  // band layers (outer pale first, inner solid on top)
+  (opts.outerBands || []).forEach(b => {
+    let i0 = dates.findIndex(d => d >= b.start);
+    let i1 = dates.findIndex(d => d >= b.end);
+    if (i0 === -1) return;
+    if (i1 === -1) i1 = n - 1;
+    svg.appendChild(el('rect', { x: x(i0), y: padT, width: Math.max(x(i1 + 1) - x(i0), 1), height: H - padT - padB, fill: 'var(--s1)', opacity: 0.14 }));
+  });
+  (opts.innerBands || []).forEach(b => {
+    let i0 = dates.findIndex(d => d >= b.start);
+    let i1 = dates.findIndex(d => d >= b.end);
+    if (i0 === -1) return;
+    if (i1 === -1) i1 = n - 1;
+    svg.appendChild(el('rect', { x: x(i0), y: padT, width: Math.max(x(i1 + 1) - x(i0), 1), height: H - padT - padB, fill: 'var(--s1)', opacity: 0.30 }));
+  });
+
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const v = vMin + (t / ticks) * (vMax - vMin);
+    const yy = y(v);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yy, y2: yy, class: 'grid-line' }));
+    const lbl = el('text', { x: padL - 8, y: yy + 3, class: 'axis-label', 'text-anchor': 'end' });
+    lbl.textContent = v.toFixed(2);
+    svg.appendChild(lbl);
+  }
+  svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yZero, y2: yZero, class: 'zero-line' }));
+
+  const nXLabels = Math.min(12, Math.round(W / 90));
+  for (let t = 0; t <= nXLabels; t++) {
+    const i = Math.round((t / nXLabels) * (n - 1));
+    const anchor = t === 0 ? 'start' : (t === nXLabels ? 'end' : 'middle');
+    const lbl = el('text', { x: x(i), y: H - padB + 16, class: 'axis-label', 'text-anchor': anchor });
+    lbl.textContent = fmtDate(dates[i]);
+    svg.appendChild(lbl);
+  }
+
+  const gap = Math.max(slot * 0.12, 0.4);
+  const barW = Math.max((slot - gap) / series.length, 1.2);
+  series.forEach((s, si) => {
+    for (let i = 0; i < n; i++) {
+      const v = s.values[i];
+      const bx = x(i) + gap / 2 + si * barW;
+      const by = Math.min(y(v), yZero);
+      const bh = Math.abs(y(v) - yZero);
+      svg.appendChild(el('rect', { x: bx, y: by, width: barW, height: Math.max(bh, 0.6), fill: s.color }));
+    }
+  });
+
+  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, opacity: 0 });
+  svg.appendChild(hoverLine);
+  const overlay = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' });
+  svg.appendChild(overlay);
+  overlay.addEventListener('mousemove', (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (W / rect.width);
+    let i = Math.floor((px - padL) / slot);
+    i = Math.max(0, Math.min(n - 1, i));
+    hoverLine.setAttribute('x1', x(i) + slot / 2); hoverLine.setAttribute('x2', x(i) + slot / 2); hoverLine.setAttribute('opacity', 1);
+    let lines = [fmtDateShort(dates[i])];
+    series.forEach(s => lines.push(s.name + ': ' + s.values[i].toFixed(3)));
+    tooltip.innerHTML = lines.join('<br>');
+    tooltip.style.opacity = 1;
+    const tx = rect.left + (x(i) / W) * rect.width + window.scrollX;
+    const ty = rect.top + (padT / H) * rect.height + window.scrollY;
+    tooltip.style.left = (tx + 12) + 'px';
+    tooltip.style.top = ty + 'px';
+  });
+  overlay.addEventListener('mouseleave', () => { tooltip.style.opacity = 0; hoverLine.setAttribute('opacity', 0); });
+}
+
+// scatter plot: categorical group (circle/triangle) + a "recent" highlight
+// group (hollow circle/triangle), with the most recent 8 as solid-filled
+// markers (same shapes, filled, so they pop out of a field of outlines) and
+// the single most recent point text-labeled
+function renderScatter(svg, tooltip, data, opts) {
+  opts = opts || {};
+  const W = 460, H = svg.viewBox.baseVal.height || 400;
+  const padL = 56, padR = 20, padT = 16, padB = 46;
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const n = data.x.length;
+  if (n === 0) { svg.appendChild(el('text', { x: W / 2, y: H / 2, 'text-anchor': 'middle', class: 'axis-label' })).textContent = 'No data'; return; }
+
+  let xMax = Math.max(...data.x.map(Math.abs)) * 1.15;
+  let yMax = Math.max(...data.y.map(Math.abs)) * 1.15;
+  const xMin = -xMax, yMin = -yMax;
+  const x = v => padL + (v - xMin) / (xMax - xMin) * (W - padL - padR);
+  const y = v => padT + (1 - (v - yMin) / (yMax - yMin)) * (H - padT - padB);
+
+  const xt = 4;
+  for (let t = 0; t <= xt; t++) {
+    const v = xMin + (t / xt) * (xMax - xMin);
+    svg.appendChild(el('line', { x1: x(v), x2: x(v), y1: padT, y2: H - padB, class: 'grid-line' }));
+    const lbl = el('text', { x: x(v), y: H - padB + 14, class: 'axis-label', 'text-anchor': 'middle' });
+    lbl.textContent = v.toFixed(2);
+    svg.appendChild(lbl);
+  }
+  const yt = 4;
+  for (let t = 0; t <= yt; t++) {
+    const v = yMin + (t / yt) * (yMax - yMin);
+    svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: y(v), y2: y(v), class: 'grid-line' }));
+    const lbl = el('text', { x: padL - 8, y: y(v) + 3, class: 'axis-label', 'text-anchor': 'end' });
+    lbl.textContent = v.toFixed(2);
+    svg.appendChild(lbl);
+  }
+  svg.appendChild(el('line', { x1: x(0), x2: x(0), y1: padT, y2: H - padB, class: 'zero-line' }));
+  svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: y(0), y2: y(0), class: 'zero-line' }));
+
+  // axis titles
+  if (opts.xLabel) {
+    const xt = el('text', { x: (padL + W - padR) / 2, y: H - 6, 'text-anchor': 'middle', class: 'axis-label', 'font-size': '11px', 'font-weight': '600', fill: 'var(--ink-soft)' });
+    xt.textContent = opts.xLabel;
+    svg.appendChild(xt);
+  }
+  if (opts.yLabel) {
+    const yt = el('text', { x: 14, y: (padT + H - padB) / 2, 'text-anchor': 'middle', class: 'axis-label', 'font-size': '11px', 'font-weight': '600', fill: 'var(--ink-soft)', transform: `rotate(-90 14 ${(padT + H - padB) / 2})` });
+    yt.textContent = opts.yLabel;
+    svg.appendChild(yt);
+  }
+
+  function marker(cx, cy, kind, color, filled) {
+    const r = filled ? 5 : 4.5;
+    if (kind === 'triangle') {
+      const d = `M${cx},${cy - r} L${cx + r},${cy + r * 0.8} L${cx - r},${cy + r * 0.8} Z`;
+      return filled
+        ? el('path', { d, fill: color })
+        : el('path', { d, fill: 'none', stroke: color, 'stroke-width': 1.4 });
+    }
+    return filled
+      ? el('circle', { cx, cy, r, fill: color })
+      : el('circle', { cx, cy, r, fill: 'none', stroke: color, 'stroke-width': 1.4 });
+  }
+
+  const dots = [];
+  // draw non-recent (hollow) first, recent (filled) on top so they're never hidden
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < n; i++) {
+      const recent = data.is_recent[i];
+      if ((pass === 0 && recent) || (pass === 1 && !recent)) continue;
+      const cx = x(data.x[i]), cy = y(data.y[i]);
+      const color = data.group[i] === 'zlb_era' ? 'var(--s2)' : 'var(--s1)';
+      const kind = data.group[i] === 'zlb_era' ? 'triangle' : 'circle';
+      const m = marker(cx, cy, kind, recent ? 'var(--s3)' : color, recent);
+      svg.appendChild(m);
+      dots.push({ el: m, i });
+    }
+  }
+  // label the single most recent point -- flip side if it would clip an edge
+  const lastI = n - 1;
+  const lx = x(data.x[lastI]), ly = y(data.y[lastI]);
+  const nearRight = lx > W - padR - 60;
+  const nearTop = ly < padT + 14;
+  const lbl = el('text', {
+    x: lx + (nearRight ? -9 : 9), y: ly + (nearTop ? 16 : -8),
+    'text-anchor': nearRight ? 'end' : 'start',
+    class: 'axis-label', fill: 'var(--s3)', 'font-weight': '600',
+  });
+  lbl.textContent = fmtDateShort(data.dates[lastI]);
+  svg.appendChild(lbl);
+
+  const overlay = el('rect', { x: 0, y: 0, width: W, height: H, fill: 'transparent' });
+  svg.appendChild(overlay);
+  overlay.addEventListener('mousemove', (ev) => {
+    const rect = svg.getBoundingClientRect();
+    const px = (ev.clientX - rect.left) * (W / rect.width);
+    const py = (ev.clientY - rect.top) * (H / rect.height);
+    let best = null, bestD = 12;
+    dots.forEach(d => {
+      const cx = x(data.x[d.i]), cy = y(data.y[d.i]);
+      const dist = Math.hypot(cx - px, cy - py);
+      if (dist < bestD) { bestD = dist; best = d.i; }
+    });
+    if (best === null) { tooltip.style.opacity = 0; return; }
+    tooltip.innerHTML = `${fmtDateShort(data.dates[best])}<br>x: ${data.x[best].toFixed(3)}<br>y: ${data.y[best].toFixed(3)}<br>${data.group[best] === 'zlb_era' ? 'Near-zero' : 'Normal'}${data.is_recent[best] ? ' (most recent)' : ''}`;
+    tooltip.style.opacity = 1;
+    tooltip.style.left = (rect.left + (x(data.x[best]) / W) * rect.width + 12 + window.scrollX) + 'px';
+    tooltip.style.top = (rect.top + (y(data.y[best]) / H) * rect.height - 30 + window.scrollY) + 'px';
+  });
+  overlay.addEventListener('mouseleave', () => { tooltip.style.opacity = 0; });
+}
+
+// ==================== TAB 0: Rate Expectations ====================
+(function () {
+  const te = DATA.tab_expectations;
+  const curLabel = fmtDateFull(te.current_date);
+  const prevLabel = fmtDateFull(te.previous_date);
+
+  document.getElementById('leg-ff-current').textContent = curLabel;
+  document.getElementById('leg-ff-previous').textContent = prevLabel;
+  document.getElementById('leg-pdf3mo-current').textContent = curLabel;
+  document.getElementById('leg-pdf3mo-previous').textContent = prevLabel;
+  document.getElementById('leg-pdfdecny-current').textContent = curLabel;
+  document.getElementById('leg-pdfdecny-previous').textContent = prevLabel;
+
+  // A snapshot's front-month contract can start well before the chart's
+  // own left edge (e.g. a "priced last month" snapshot's front contract
+  // started weeks before "today minus one month"). Left-censor at tMin:
+  // keep whatever rate was in effect there, but pin its start to the edge
+  // itself, so the step line never runs off the front of the chart.
+  function clipStepSeries(points, tMinStr) {
+    const before = points.filter(p => p.t < tMinStr);
+    const atOrAfter = points.filter(p => p.t >= tMinStr);
+    if (before.length > 0) atOrAfter.unshift({ t: tMinStr, v: before[before.length - 1].v });
+    return atOrAfter;
+  }
+
+  const tMin = te.effr_dates[0];
+  const history = te.effr_dates.map((d, i) => ({ t: d, v: te.effr_rate[i] }));
+  const curPath = clipStepSeries(te.ff_path_current.map(p => ({ t: p.start, v: p.rate })), tMin);
+  const prevPath = clipStepSeries(te.ff_path_previous.map(p => ({ t: p.start, v: p.rate })), tMin);
+
+  renderStepChart(
+    document.getElementById('chart-ff-path'),
+    document.getElementById('tt-ff-path'),
+    [
+      { name: 'Actual rate', color: 'var(--s3)', points: history },
+      { name: curLabel, color: 'var(--s1)', points: curPath, extend: true },
+      { name: prevLabel, color: 'var(--s2)', dashed: true, points: prevPath, extend: true },
+    ],
+    { tMin, tMax: te.through, todayLine: te.current_date, todayLabel: fmtDateShort(te.current_date), includeZero: false }
+  );
+
+  document.getElementById('pdf3mo-h2').textContent =
+    `Rate probabilities, ${fmtContract(te.contract_3mo)}`;
+  renderProbBars(
+    document.getElementById('chart-pdf-3mo'), document.getElementById('tt-pdf-3mo'),
+    te.pdf_3mo_current, te.pdf_3mo_previous, curLabel, prevLabel
+  );
+
+  document.getElementById('pdfdecny-h2').textContent =
+    `Rate probabilities, ${fmtContract(te.contract_dec_ny)}`;
+  renderProbBars(
+    document.getElementById('chart-pdf-decny'), document.getElementById('tt-pdf-decny'),
+    te.pdf_dec_ny_current, te.pdf_dec_ny_previous, curLabel, prevLabel
+  );
+})();
+
+// ==================== TAB 1: Policy Surprises ====================
+(function () {
+  const t1 = DATA.tab1;
+  renderBarChart(
+    document.getElementById('chart-bars'),
+    document.getElementById('tt-bars'),
+    t1.dates,
+    [
+      { name: 'ED1 surprise', values: t1.ed1, color: 'var(--s1)' },
+      { name: 'UST10Y surprise', values: t1.ust10y, color: 'var(--s2)' },
+    ],
+    { outerBands: t1.era_bands, innerBands: t1.era_ratio_bands }
+  );
+  renderScatter(document.getElementById('chart-scatter1'), document.getElementById('tt-scatter1'), t1.scatter_2y_10y,
+    { xLabel: 'UST2Y surprise', yLabel: 'UST10Y surprise' });
+  renderScatter(document.getElementById('chart-scatter2'), document.getElementById('tt-scatter2'), t1.scatter_2y_bei5y,
+    { xLabel: 'UST2Y surprise', yLabel: '5yr breakeven surprise' });
+})();
+
+// ==================== TAB 2: Equity ====================
+(function () {
+  const t2 = DATA.tab2;
+  const container = document.getElementById('eq-dotcharts');
+  ['era', 'era_ratio'].forEach(scheme => {
+    const rows = t2.static.filter(r => r.grouping === scheme);
+    const nonzlb = rows.find(r => r.group === 'non_zlb_era');
+    const zlb = rows.find(r => r.group === 'zlb_era');
+    if (!nonzlb || !zlb) return;
+    const afRow = rows.find(r => r.af_p !== null);
+    const title = scheme === 'era' ? 'Using official Fed dates' : 'Using market-based timing';
+    const note = afRow ? sigNote(afRow.af_p) : '';
+    renderDotWhisker(container, title, note, [
+      { label: 'Normal', coef: nonzlb.coef, se: nonzlb.se, color: 'var(--s1)' },
+      { label: 'Near-zero', coef: zlb.coef, se: zlb.se, color: 'var(--s2)' },
+    ]);
+  });
+
+  const dates = t2.roll_dates;
+  const upper = t2.roll_coef.map((c, i) => c + t2.roll_se[i]);
+  const lower = t2.roll_coef.map((c, i) => c - t2.roll_se[i]);
+  renderTimeChart(
+    document.getElementById('chart-roll-equity'),
+    document.getElementById('tt-roll-equity'),
+    dates,
+    [{ name: '10yr coefficient', values: t2.roll_coef, color: 'var(--s1)' }],
+    {
+      band: { upper, lower }, tooltipDecimals: 2,
+      outerBands: DATA.tab1.era_bands, innerBands: DATA.tab1.era_ratio_bands,
+    }
+  );
+})();
+
+// ==================== TAB 3: Corporate ====================
+(function () {
+  const t3 = DATA.tab3;
+  const modelLabel = { baa_20yr: 'Baa', aaa_20yr: 'Aaa' };
+
+  const rollDates = t3.roll_dates;
+  const rollOpts = (coef, se) => ({
+    band: { upper: coef.map((c, i) => c + se[i]), lower: coef.map((c, i) => c - se[i]) },
+    tooltipDecimals: 2,
+    outerBands: DATA.tab1.era_bands, innerBands: DATA.tab1.era_ratio_bands,
+  });
+  renderTimeChart(
+    document.getElementById('chart-roll-baa'), document.getElementById('tt-roll-baa'), rollDates,
+    [{ name: '20yr coefficient', values: t3.roll_baa_coef, color: 'var(--s1)' }],
+    rollOpts(t3.roll_baa_coef, t3.roll_baa_se)
+  );
+  renderTimeChart(
+    document.getElementById('chart-roll-aaa'), document.getElementById('tt-roll-aaa'), rollDates,
+    [{ name: '20yr coefficient', values: t3.roll_aaa_coef, color: 'var(--s1)' }],
+    rollOpts(t3.roll_aaa_coef, t3.roll_aaa_se)
+  );
+
+  const container = document.getElementById('corp-dotcharts');
+  ['baa_20yr', 'aaa_20yr'].forEach(model => {
+    ['era', 'era_ratio'].forEach(scheme => {
+      const rows = t3.static.filter(r => r.model === model && r.grouping === scheme);
+      const nonzlb = rows.find(r => r.group === 'non_zlb_era');
+      const zlb = rows.find(r => r.group === 'zlb_era');
+      if (!nonzlb || !zlb) return;
+      const af = rows.find(r => r.af_p !== null);
+      const title = `${modelLabel[model]}, ${scheme === 'era' ? 'official dates' : 'market-based timing'}`;
+      const note = af ? sigNote(af.af_p) : '';
+      renderDotWhisker(container, title, note, [
+        { label: 'Normal', coef: nonzlb.coef, se: nonzlb.se, color: 'var(--s1)' },
+        { label: 'Near-zero', coef: zlb.coef, se: zlb.se, color: 'var(--s2)' },
+      ]);
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+name: Update monetary policy dashboard
+
+on:
+  push:
+    paths:
+      - 'cme_derived/**'
+  schedule:
+    # 11:00 UTC daily -- after the CME-derived push typically lands, and
+    # catches USMPD updates (roughly 8x/year, around FOMC meetings) and
+    # daily FRED series even on days with no CME update.
+    - cron: '0 11 * * 1-5'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        working-directory: scripts
+        run: |
+          python3 00_fetch_usmpd.py
+          python3 00_fetch_fred_corporate.py
+          python3 05_fetch_fred_dff.py
+          python3 01_load_full_sample.py --force
+          python3 02_production_estimates.py
+          python3 03_build_dashboard_data.py
+          python3 04_build_dashboard.py
+
+      - name: Commit updated dashboard if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          git diff --staged --quiet || git commit -m "Update dashboard $(date -u +%Y-%m-%d)"
+          git push
