@@ -541,7 +541,13 @@
 <script>
 const DATA = JSON.parse(document.getElementById('data-payload').textContent);
 
-document.getElementById('meta-asof').textContent = 'Data as of ' + DATA.as_of;
+// Two different data vintages feed this dashboard: CME rate-expectations
+// data updates far more often than the FOMC meets, so a single "as of"
+// date would misrepresent whichever series is behind. Show both rather
+// than pick one.
+document.getElementById('meta-asof').textContent =
+  'Rate expectations as of ' + DATA.tab_expectations.current_date +
+  ' · policy surprises & pass-through as of ' + DATA.as_of;
 document.getElementById('foot-run').textContent = 'Run ' + DATA.run_date;
 
 // ---- tabs ----
