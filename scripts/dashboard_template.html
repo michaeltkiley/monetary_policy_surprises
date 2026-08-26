@@ -3,20 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Monetary Policy Surprises</title>
+<title>Monetary Policy Expectations</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --surface:      #fcfcfb;
-    --page:         #f9f9f7;
-    --ink:          #0b0b0b;
-    --ink-soft:     #52514e;
-    --ink-faint:    #898781;
-    --grid:         #e1e0d9;
-    --baseline:     #c3c2b7;
-    --border:       rgba(11,11,11,0.10);
+    --surface:      #ffffff;
+    --page:         #eef1f4;
+    --ink:          #10151d;
+    --ink-soft:     #4b5568;
+    --ink-faint:    #7c8698;
+    --grid:         #e8ecef;
+    --baseline:     #dde3e8;
+    --border:       #dde3e8;
+    --accent-text:  #1c5cab;
     --s1: #2a78d6;   /* categorical slot 1: non_zlb_era / Baa */
     --s2: #eb6834;   /* categorical slot 2: zlb_era / Aaa */
     --s3: #1baf7a;   /* categorical slot 3: activity ratio */
@@ -29,14 +30,15 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --surface:    #1a1a19;
-      --page:       #0d0d0d;
-      --ink:        #ffffff;
-      --ink-soft:   #c3c2b7;
-      --ink-faint:  #898781;
-      --grid:       #2c2c2a;
-      --baseline:   #383835;
-      --border:     rgba(255,255,255,0.10);
+      --surface:    #191f27;
+      --page:       #12161c;
+      --ink:        #f2f4f7;
+      --ink-soft:   #b7c0cc;
+      --ink-faint:  #7c8798;
+      --grid:       #212933;
+      --baseline:   #2a323d;
+      --border:     #2a323d;
+      --accent-text: #74aeef;
       --s1: #3987e5;
       --s2: #d95926;
       --s3: #199e70;
@@ -49,14 +51,15 @@
     }
   }
   :root[data-theme="dark"] {
-    --surface:    #1a1a19;
-    --page:       #0d0d0d;
-    --ink:        #ffffff;
-    --ink-soft:   #c3c2b7;
-    --ink-faint:  #898781;
-    --grid:       #2c2c2a;
-    --baseline:   #383835;
-    --border:     rgba(255,255,255,0.10);
+    --surface:    #191f27;
+    --page:       #12161c;
+    --ink:        #f2f4f7;
+    --ink-soft:   #b7c0cc;
+    --ink-faint:  #7c8798;
+    --grid:       #212933;
+    --baseline:   #2a323d;
+    --border:     #2a323d;
+    --accent-text: #74aeef;
     --s1: #3987e5;
     --s2: #d95926;
     --s3: #199e70;
@@ -72,7 +75,7 @@
     margin: 0;
     background: var(--page);
     color: var(--ink);
-    font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 16px;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
@@ -98,7 +101,7 @@
     display: flex; gap: 0.4rem; margin: 2rem 0 0; border-bottom: 1px solid var(--border);
   }
   .tab-btn {
-    font-family: 'Public Sans', sans-serif; font-size: 0.92rem; font-weight: 600;
+    font-family: 'IBM Plex Sans', sans-serif; font-size: 0.92rem; font-weight: 600;
     color: var(--ink-faint); background: none; border: none; cursor: pointer;
     padding: 0.7rem 0.2rem; margin-right: 1.4rem; border-bottom: 2px solid transparent;
   }
@@ -131,7 +134,7 @@
   .chart-wrap { position: relative; }
   .roll-stack { display: flex; flex-direction: column; gap: 1.4rem; }
   .chart-sub-label {
-    font-family: 'Public Sans', sans-serif; font-weight: 600; font-size: 0.82rem;
+    font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 0.82rem;
     color: var(--ink-soft); margin: 0 0 0.3rem;
   }
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.4rem; }
@@ -149,7 +152,7 @@
     padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border);
   }
   table.simple td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; }
-  table.simple td.lbl { font-family: 'Public Sans', sans-serif; }
+  table.simple td.lbl { font-family: 'IBM Plex Sans', sans-serif; }
   section.notes {
     padding-top: 1.5rem; border-top: 1px solid var(--border);
   }
@@ -191,14 +194,14 @@
   }
   .site-nav nav { display: flex; gap: 20px; }
   .site-nav nav a {
-    font-family: "Public Sans", sans-serif;
+    font-family: "IBM Plex Sans", sans-serif;
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.02em;
     color: var(--ink-soft);
     text-decoration: none;
   }
-  .site-nav nav a:hover, .site-nav nav a.active { color: var(--s1); }
+  .site-nav nav a:hover, .site-nav nav a.active { color: var(--accent-text); }
 </style>
 </head>
 <body>
@@ -217,8 +220,8 @@
 
 <div class="page">
 
-  <p class="eyebrow">Monetary policy surprises</p>
-  <h1>Policy Surprise Dashboard</h1>
+  <p class="eyebrow">Federal Reserve policy</p>
+  <h1>Monetary Policy Expectations</h1>
   <p class="lede">
     What markets expect from the Fed next, how Fed announcements move
     markets, and how that's changed since rates hit zero -- for stocks and
@@ -728,7 +731,7 @@ function renderDotWhisker(container, title, note, points) {
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   const wrap = document.createElement('div');
   const h3 = document.createElement('div');
-  h3.style.fontFamily = "'Public Sans', sans-serif";
+  h3.style.fontFamily = "'IBM Plex Sans', sans-serif";
   h3.style.fontWeight = '600';
   h3.style.fontSize = '0.88rem';
   h3.style.marginBottom = '0.15rem';
