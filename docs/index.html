@@ -9,15 +9,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --surface:      #ffffff;
-    --page:         #eef1f4;
+    --surface-card: #ffffff;
+    --surface-page: #eef1f4;
     --ink:          #10151d;
-    --ink-soft:     #4b5568;
-    --ink-faint:    #7c8698;
-    --grid:         #e8ecef;
-    --baseline:     #dde3e8;
-    --border:       #dde3e8;
+    --ink-secondary:#4b5568;
+    --ink-muted:    #7c8698;
+    --rule-soft:    #e8ecef;
+    --rule:         #dde3e8;
     --accent-text:  #1c5cab;
+    --shadow: 0 1px 2px rgba(16, 21, 29, 0.04), 0 8px 24px -16px rgba(16, 21, 29, 0.18);
     --s1: #2a78d6;   /* categorical slot 1: non_zlb_era / Baa */
     --s2: #eb6834;   /* categorical slot 2: zlb_era / Aaa */
     --s3: #1baf7a;   /* categorical slot 3: activity ratio */
@@ -30,15 +30,15 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --surface:    #191f27;
-      --page:       #12161c;
-      --ink:        #f2f4f7;
-      --ink-soft:   #b7c0cc;
-      --ink-faint:  #7c8798;
-      --grid:       #212933;
-      --baseline:   #2a323d;
-      --border:     #2a323d;
-      --accent-text: #74aeef;
+      --surface-card: #191f27;
+      --surface-page: #12161c;
+      --ink:          #f2f4f7;
+      --ink-secondary:#b7c0cc;
+      --ink-muted:    #7c8798;
+      --rule-soft:    #212933;
+      --rule:         #2a323d;
+      --accent-text:  #74aeef;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -16px rgba(0, 0, 0, 0.55);
       --s1: #3987e5;
       --s2: #d95926;
       --s3: #199e70;
@@ -51,15 +51,15 @@
     }
   }
   :root[data-theme="dark"] {
-    --surface:    #191f27;
-    --page:       #12161c;
-    --ink:        #f2f4f7;
-    --ink-soft:   #b7c0cc;
-    --ink-faint:  #7c8798;
-    --grid:       #212933;
-    --baseline:   #2a323d;
-    --border:     #2a323d;
-    --accent-text: #74aeef;
+    --surface-card: #191f27;
+    --surface-page: #12161c;
+    --ink:          #f2f4f7;
+    --ink-secondary:#b7c0cc;
+    --ink-muted:    #7c8798;
+    --rule-soft:    #212933;
+    --rule:         #2a323d;
+    --accent-text:  #74aeef;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -16px rgba(0, 0, 0, 0.55);
     --s1: #3987e5;
     --s2: #d95926;
     --s3: #199e70;
@@ -73,7 +73,7 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--page);
+    background: var(--surface-page);
     color: var(--ink);
     font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 16px;
@@ -84,25 +84,33 @@
   .eyebrow {
     font-family: 'IBM Plex Mono', ui-monospace, monospace;
     font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--s3); font-weight: 600; margin: 0 0 0.75rem;
+    color: var(--accent-text); font-weight: 600; margin: 0 0 0.75rem;
   }
   h1 {
     font-family: 'Newsreader', Georgia, serif; font-weight: 500;
     font-size: clamp(1.8rem, 3.5vw, 2.4rem); line-height: 1.15;
     margin: 0 0 0.75rem; text-wrap: balance;
   }
-  .lede { max-width: 62ch; color: var(--ink-soft); font-size: 1.02rem; margin: 0; }
+  .subtitle {
+    margin: 0; max-width: 70ch; font-family: "Newsreader", Georgia, serif;
+    font-style: italic; font-weight: 500; font-size: 17px; line-height: 1.5;
+    color: var(--ink-secondary);
+  }
+  .citation { margin: 8px 0 0; max-width: 70ch; font-size: 13px; line-height: 1.5; color: var(--ink-muted); }
+  .citation b { color: var(--ink-secondary); font-weight: 600; }
+  .reference-lines { margin: 10px 0 0; max-width: 70ch; display: flex; flex-direction: column; gap: 3px; }
+  .reference-lines p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-muted); }
   .meta-row {
     display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem;
-    margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--border);
-    font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--ink-faint);
+    margin-top: 1.5rem; padding-top: 1.1rem; border-top: 1px solid var(--rule);
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--ink-muted);
   }
   nav.tabs {
-    display: flex; gap: 0.4rem; margin: 2rem 0 0; border-bottom: 1px solid var(--border);
+    display: flex; gap: 0.4rem; margin: 2rem 0 0; border-bottom: 1px solid var(--rule);
   }
   .tab-btn {
     font-family: 'IBM Plex Sans', sans-serif; font-size: 0.92rem; font-weight: 600;
-    color: var(--ink-faint); background: none; border: none; cursor: pointer;
+    color: var(--ink-muted); background: none; border: none; cursor: pointer;
     padding: 0.7rem 0.2rem; margin-right: 1.4rem; border-bottom: 2px solid transparent;
   }
   .tab-btn.active { color: var(--ink); border-bottom-color: var(--s1); }
@@ -110,23 +118,23 @@
   .tab-panel { display: none; flex-direction: column; gap: 1.75rem; padding-top: 2rem; }
   .tab-panel.active { display: flex; }
   section.card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    padding: 1.75rem 1.9rem 2rem;
+    background: var(--surface-card); border: 1px solid var(--rule); border-radius: 12px;
+    padding: 1.75rem 1.9rem 2rem; box-shadow: var(--shadow);
   }
   h2 { font-family: 'Newsreader', Georgia, serif; font-weight: 500; font-size: 1.3rem; margin: 0 0 0.4rem; }
-  .card-note { font-size: 0.9rem; color: var(--ink-soft); max-width: 68ch; margin: 0 0 1.1rem; }
+  .card-note { font-size: 0.9rem; color: var(--ink-secondary); max-width: 68ch; margin: 0 0 1.1rem; }
   .chart-scroll { overflow-x: auto; }
   svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
-  .axis-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; fill: var(--ink-faint); }
-  .grid-line { stroke: var(--grid); stroke-width: 1; }
-  .zero-line { stroke: var(--baseline); stroke-width: 1; }
+  .axis-label { font-family: 'IBM Plex Mono', monospace; font-size: 10px; fill: var(--ink-muted); }
+  .grid-line { stroke: var(--rule-soft); stroke-width: 1; }
+  .zero-line { stroke: var(--rule); stroke-width: 1; }
   .series-path { fill: none; stroke-width: 2; }
   .band { opacity: 0.16; }
-  .legend { display: flex; gap: 1.1rem; flex-wrap: wrap; margin-top: 0.6rem; font-size: 0.82rem; color: var(--ink-soft); }
+  .legend { display: flex; gap: 1.1rem; flex-wrap: wrap; margin-top: 0.6rem; font-size: 0.82rem; color: var(--ink-secondary); }
   .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 0.4rem; vertical-align: -1px; }
   .tooltip {
-    position: absolute; pointer-events: none; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.7rem;
+    position: absolute; pointer-events: none; background: var(--surface-card);
+    border: 1px solid var(--rule); border-radius: 8px; padding: 0.5rem 0.7rem;
     font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; color: var(--ink);
     box-shadow: 0 4px 16px rgba(0,0,0,0.12); opacity: 0; transition: opacity 0.1s;
     white-space: nowrap; z-index: 5;
@@ -135,38 +143,41 @@
   .roll-stack { display: flex; flex-direction: column; gap: 1.4rem; }
   .chart-sub-label {
     font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 0.82rem;
-    color: var(--ink-soft); margin: 0 0 0.3rem;
+    color: var(--ink-secondary); margin: 0 0 0.3rem;
   }
   .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.4rem; }
   .stat-strip { display: flex; gap: 1.2rem; flex-wrap: wrap; margin-bottom: 1rem; }
   .stat-box {
-    background: var(--page); border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface-page); border: 1px solid var(--rule); border-radius: 8px;
     padding: 0.6rem 0.9rem; font-family: 'IBM Plex Mono', monospace;
   }
-  .stat-box .l { font-size: 0.68rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-box .l { font-size: 0.68rem; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; }
   .stat-box .v { font-size: 1rem; font-weight: 600; }
   table.simple { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
   table.simple th {
     text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem;
-    text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-faint);
-    padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border);
+    text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted);
+    padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--rule);
   }
-  table.simple td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); font-family: 'IBM Plex Mono', monospace; }
+  table.simple td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); font-family: 'IBM Plex Mono', monospace; }
   table.simple td.lbl { font-family: 'IBM Plex Sans', sans-serif; }
-  section.notes {
-    padding-top: 1.5rem; border-top: 1px solid var(--border);
+  .methodology {
+    display: flex; flex-direction: column; gap: 8px;
+    padding: 18px 0 0; border-top: 1px solid var(--rule);
+    font-size: 12.5px; line-height: 1.65; color: var(--ink-muted);
   }
-  section.notes h2 { font-size: 1rem; color: var(--ink-soft); margin: 0 0 0.9rem; }
-  section.notes ul { margin: 0; padding: 0 0 0 1.1rem; max-width: 72ch; }
-  section.notes li { font-size: 0.86rem; color: var(--ink-soft); margin-bottom: 0.7rem; }
-  section.notes li:last-child { margin-bottom: 0; }
-  section.notes li.disclaimer { color: var(--ink-faint); font-style: italic; }
-  section.notes b { color: var(--ink); font-weight: 600; }
-  section.notes a { color: var(--s1); text-decoration-color: var(--border); }
-  section.notes a:hover { text-decoration-color: currentColor; }
-  footer {
-    margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
-    font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--ink-faint);
+  .methodology a { color: var(--accent-text); }
+  .methodology b { color: var(--ink-secondary); font-weight: 600; }
+  .methodology .disclaimer { font-style: italic; }
+  .methodology .sources { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; }
+  .references-block { display: flex; flex-direction: column; gap: 3px; padding-top: 4px; }
+  .references-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-secondary);
+  }
+  footer.run-info {
+    margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; color: var(--ink-muted);
     display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;
   }
   @media (max-width: 640px) {
@@ -174,7 +185,7 @@
     .page { padding: 2rem 1rem 3rem; }
   }
 
-  .site-nav { border-bottom: 1px solid var(--border); background: var(--surface); }
+  .site-nav { border-bottom: 1px solid var(--rule); background: var(--surface-card); }
   .site-nav-inner {
     max-width: 1120px;
     margin: 0 auto;
@@ -198,7 +209,7 @@
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.02em;
-    color: var(--ink-soft);
+    color: var(--ink-secondary);
     text-decoration: none;
   }
   .site-nav nav a:hover, .site-nav nav a.active { color: var(--accent-text); }
@@ -216,6 +227,7 @@
       <a href="https://michaeltkiley.github.io/monetary_policy_surprises/" class="active">Monetary Policy Expectations</a>
       <a href="https://michaeltkiley.github.io/resource_utilization/">Resource Utilization and Risk</a>
       <a href="https://michaeltkiley.github.io/equilibrium_rate/">Equilibrium Real Interest Rate</a>
+      <a href="https://michaeltkiley.github.io/inflation_forecast/">Inflation Forecast</a>
     </nav>
   </div>
 </div>
@@ -224,11 +236,12 @@
 
   <p class="eyebrow">Federal Reserve policy</p>
   <h1>Monetary Policy Expectations</h1>
-  <p class="lede">
-    What markets expect from the Fed next, how Fed announcements move
-    markets, and how that's changed since rates hit zero -- for stocks and
-    for corporate borrowing costs, 1994 to today.
-  </p>
+  <p class="subtitle">What markets expect from the Fed next, how Fed announcements move markets, and how that&rsquo;s changed since rates hit zero &mdash; for stocks and for corporate borrowing costs, 1994 to today.</p>
+  <p class="citation">Extends two papers by economist Michael Kiley on how Fed announcements pass through to long&#8209;term asset prices, using surprise moves in interest rates around FOMC meetings, before and after the zero lower bound: the <b>Stocks</b> tab covers the pass&#8209;through to equity prices, the <b>Corporate Bonds</b> tab to corporate borrowing costs.</p>
+  <div class="reference-lines">
+    <p>Equity pass&#8209;through based on M.T. Kiley (2014), &ldquo;The Response of Equity Prices to Movements in Long&#8209;Term Interest Rates Associated with Monetary Policy Statements: Before and After the Zero Lower Bound,&rdquo; <i>Journal of Money, Credit and Banking</i>, 46(5&ndash;6), 1057&ndash;1071.</p>
+    <p>Corporate bond pass&#8209;through based on M.T. Kiley (2016), &ldquo;Monetary Policy Statements, Treasury Yields, and Private Yields: Before and After the Zero Lower Bound,&rdquo; <i>Finance Research Letters</i>, 18, 285&ndash;290.</p>
+  </div>
   <div class="meta-row">
     <span id="meta-asof"></span>
   </div>
@@ -292,26 +305,14 @@
       </div>
     </section>
 
-    <section class="notes">
-      <h2>Notes &amp; sources</h2>
-      <ul>
-        <li class="disclaimer">For informational purposes only. All
-          downloads and calculations are the author's own and may contain
-          errors -- don't rely on this for decisions or conclusions.
-          Verify independently with your own data and calculations before
-          using it for any purpose.</li>
-        <li><b>Rate expectations:</b> the Fed funds futures curve and SOFR
-          options-implied probabilities are both settlement-price data
-          from <a href="https://www.cmegroup.com/" target="_blank" rel="noopener">CME Group</a>,
-          with the probabilities extracted using the risk-neutral-density
-          method of Carlson, Craig, and Melick (2005), "<a href="https://www.clevelandfed.org/publications/working-paper/2005/wp-0507-recovering-market-expectations-of-fomc-rate-changes" target="_blank" rel="noopener">Recovering Market
-          Expectations of FOMC Rate Changes with Options on Federal Funds
-          Futures</a>," Federal Reserve Bank of Cleveland Working Paper No.
-          05-07 (published in the <i>Journal of Futures Markets</i>, 2005,
-          26(12), 1203&ndash;1242). The actual fed funds rate history is
-          FRED's <a href="https://fred.stlouisfed.org/series/DFF" target="_blank" rel="noopener">DFF</a> series.</li>
-      </ul>
-    </section>
+    <footer class="methodology">
+      <div class="disclaimer">For informational purposes only. All downloads and calculations are the author&rsquo;s own and may contain errors &mdash; don&rsquo;t rely on this for decisions or conclusions. Verify independently with your own data and calculations before using it for any purpose.</div>
+      <div><b>Rate expectations</b> &mdash; the Fed funds futures curve and SOFR options&#8209;implied probabilities are both settlement&#8209;price data from <a href="https://www.cmegroup.com/" target="_blank" rel="noopener">CME Group</a>, with the probabilities extracted using the risk&#8209;neutral&#8209;density method of Carlson, Craig, and Melick (2005). The actual fed funds rate history is FRED&rsquo;s <a href="https://fred.stlouisfed.org/series/DFF" target="_blank" rel="noopener">DFF</a> series.</div>
+      <div class="references-block">
+        <div class="references-label">References</div>
+        <div>Carlson, Craig &amp; Melick (2005), &ldquo;Recovering Market Expectations of FOMC Rate Changes with Options on Federal Funds Futures,&rdquo; Federal Reserve Bank of Cleveland Working Paper No. 05&#8209;07, published in <i>Journal of Futures Markets</i> (2005), 26(12), 1203&ndash;1242. &mdash; probability&#8209;extraction method.</div>
+      </div>
+    </footer>
   </section>
 
   <section class="tab-panel" id="tab-surprises">
@@ -360,29 +361,15 @@
       </div>
     </section>
 
-    <section class="notes">
-      <h2>Notes &amp; sources</h2>
-      <ul>
-        <li class="disclaimer">For informational purposes only. All
-          downloads and calculations are the author's own and may contain
-          errors -- don't rely on this for decisions or conclusions.
-          Verify independently with your own data and calculations before
-          using it for any purpose.</li>
-        <li><b>Data:</b> Fed-meeting surprises from the
-          <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event-Study Database</a>
-          (Acosta, Ajello, Bauer, Loria, and Miranda-Agrippino, 2025,
-          "Financial Market Effects of FOMC Communication," Federal Reserve
-          Bank of San Francisco Working Paper 2025-30), 1994&ndash;present.
-          A few announcements with no rate surprise attached are dropped,
-          as are the six COVID-shock meetings in March&ndash;April 2020,
-          whose moves were extreme outliers.</li>
-        <li><b>Near-zero rates, two ways:</b> "official dates" is simply
-          when the Fed's target rate was at zero. "Market-based" instead
-          looks at how actively short-term rates were being priced, since
-          markets sometimes started expecting a move before -- or kept
-          expecting one after -- the official change.</li>
-      </ul>
-    </section>
+    <footer class="methodology">
+      <div class="disclaimer">For informational purposes only. All downloads and calculations are the author&rsquo;s own and may contain errors &mdash; don&rsquo;t rely on this for decisions or conclusions. Verify independently with your own data and calculations before using it for any purpose.</div>
+      <div><b>Data</b> &mdash; Fed&#8209;meeting surprises from the <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event&#8209;Study Database</a>, 1994&ndash;present. A few announcements with no rate surprise attached are dropped, as are the six COVID&#8209;shock meetings in March&ndash;April 2020, whose moves were extreme outliers.</div>
+      <div><b>Near&#8209;zero rates, two ways</b> &mdash; &ldquo;official dates&rdquo; is simply when the Fed&rsquo;s target rate was at zero. &ldquo;Market&#8209;based&rdquo; instead looks at how actively short&#8209;term rates were being priced, since markets sometimes started expecting a move before &mdash; or kept expecting one after &mdash; the official change.</div>
+      <div class="references-block">
+        <div class="references-label">References</div>
+        <div>Acosta, Ajello, Bauer, Loria &amp; Miranda&#8209;Agrippino (2025), &ldquo;Financial Market Effects of FOMC Communication,&rdquo; Federal Reserve Bank of San Francisco Working Paper 2025&#8209;30. &mdash; event&#8209;study database.</div>
+      </div>
+    </footer>
   </section>
 
   <section class="tab-panel" id="tab-equity">
@@ -415,39 +402,17 @@
       <div class="grid2" id="eq-dotcharts"></div>
     </section>
 
-    <section class="notes">
-      <h2>Notes &amp; sources</h2>
-      <ul>
-        <li class="disclaimer">For informational purposes only. All
-          downloads and calculations are the author's own and may contain
-          errors -- don't rely on this for decisions or conclusions.
-          Verify independently with your own data and calculations before
-          using it for any purpose.</li>
-        <li><b>Data:</b> Fed-meeting surprises from the
-          <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event-Study Database</a>
-          (Acosta, Ajello, Bauer, Loria, and Miranda-Agrippino, 2025,
-          "Financial Market Effects of FOMC Communication," Federal Reserve
-          Bank of San Francisco Working Paper 2025-30), 1994&ndash;present.
-          A few announcements with no rate surprise attached are dropped,
-          as are the six COVID-shock meetings in March&ndash;April 2020,
-          whose moves were extreme outliers.</li>
-        <li><b>Near-zero rates, two ways:</b> "official dates" is simply
-          when the Fed's target rate was at zero. "Market-based" instead
-          looks at how actively short-term rates were being priced, since
-          markets sometimes started expecting a move before -- or kept
-          expecting one after -- the official change.</li>
-        <li><b>Margins of error:</b> the shaded band on the over-time chart
-          shows &plusmn;1 standard error; whiskers on the comparison chart
-          show a wider &plusmn;1.96 (a 95% interval). The comparison chart
-          also notes whether the normal-vs-near-zero gap is likely more
-          than noise (a formal test of whether the two estimates differ).</li>
-        <li><b>Paper this extends:</b> Kiley, M. T. (2014), "The Response
-          of Equity Prices to Movements in Long-Term Interest Rates
-          Associated with Monetary Policy Statements: Before and After the
-          Zero Lower Bound," <i>Journal of Money, Credit and Banking</i>,
-          46(5&ndash;6), 1057&ndash;1071.</li>
-      </ul>
-    </section>
+    <footer class="methodology">
+      <div class="disclaimer">For informational purposes only. All downloads and calculations are the author&rsquo;s own and may contain errors &mdash; don&rsquo;t rely on this for decisions or conclusions. Verify independently with your own data and calculations before using it for any purpose.</div>
+      <div><b>Data</b> &mdash; Fed&#8209;meeting surprises from the <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event&#8209;Study Database</a>, 1994&ndash;present. A few announcements with no rate surprise attached are dropped, as are the six COVID&#8209;shock meetings in March&ndash;April 2020, whose moves were extreme outliers.</div>
+      <div><b>Near&#8209;zero rates, two ways</b> &mdash; &ldquo;official dates&rdquo; is simply when the Fed&rsquo;s target rate was at zero. &ldquo;Market&#8209;based&rdquo; instead looks at how actively short&#8209;term rates were being priced, since markets sometimes started expecting a move before &mdash; or kept expecting one after &mdash; the official change.</div>
+      <div><b>Margins of error</b> &mdash; the shaded band on the over&#8209;time chart shows &plusmn;1 standard error; whiskers on the comparison chart show a wider &plusmn;1.96 (a 95% interval). The comparison chart also notes whether the normal&#8209;vs&#8209;near&#8209;zero gap is likely more than noise (a formal test of whether the two estimates differ).</div>
+      <div class="references-block">
+        <div class="references-label">References</div>
+        <div>Acosta, Ajello, Bauer, Loria &amp; Miranda&#8209;Agrippino (2025), &ldquo;Financial Market Effects of FOMC Communication,&rdquo; Federal Reserve Bank of San Francisco Working Paper 2025&#8209;30. &mdash; event&#8209;study database.</div>
+        <div>M.T. Kiley (2014), &ldquo;The Response of Equity Prices to Movements in Long&#8209;Term Interest Rates Associated with Monetary Policy Statements: Before and After the Zero Lower Bound,&rdquo; <i>Journal of Money, Credit and Banking</i>, 46(5&ndash;6), 1057&ndash;1071. &mdash; paper this tab extends.</div>
+      </div>
+    </footer>
   </section>
 
   <section class="tab-panel" id="tab-corporate">
@@ -490,53 +455,22 @@
       <div class="grid2" id="corp-dotcharts"></div>
     </section>
 
-    <section class="notes">
-      <h2>Notes &amp; sources</h2>
-      <ul>
-        <li class="disclaimer">For informational purposes only. All
-          downloads and calculations are the author's own and may contain
-          errors -- don't rely on this for decisions or conclusions.
-          Verify independently with your own data and calculations before
-          using it for any purpose.</li>
-        <li><b>Data:</b> Fed-meeting surprises from the
-          <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event-Study Database</a>
-          (Acosta, Ajello, Bauer, Loria, and Miranda-Agrippino, 2025,
-          "Financial Market Effects of FOMC Communication," Federal Reserve
-          Bank of San Francisco Working Paper 2025-30), 1994&ndash;present.
-          A few announcements with no rate surprise attached are dropped,
-          as are the six COVID-shock meetings in March&ndash;April 2020,
-          whose moves were extreme outliers.</li>
-        <li><b>Corporate &amp; Treasury yields:</b> daily
-          <a href="https://fred.stlouisfed.org/series/DGS10" target="_blank" rel="noopener">10-year</a> and
-          <a href="https://fred.stlouisfed.org/series/DGS20" target="_blank" rel="noopener">20-year</a> Treasury,
-          Moody's <a href="https://fred.stlouisfed.org/series/DAAA" target="_blank" rel="noopener">Aaa</a> and
-          <a href="https://fred.stlouisfed.org/series/DBAA" target="_blank" rel="noopener">Baa</a> corporate
-          yields, from <a href="https://fred.stlouisfed.org/" target="_blank" rel="noopener">FRED</a>
-          (Federal Reserve Bank of St. Louis).</li>
-        <li><b>Near-zero rates, two ways:</b> "official dates" is simply
-          when the Fed's target rate was at zero. "Market-based" instead
-          looks at how actively short-term rates were being priced, since
-          markets sometimes started expecting a move before -- or kept
-          expecting one after -- the official change.</li>
-        <li><b>Why a 20-year Treasury for corporate bonds:</b> following
-          Kiley (2016), whose own check found the 20-year yield explains
-          corporate-bond moves much better than the 10-year does,
-          especially since 2008.</li>
-        <li><b>Margins of error:</b> the shaded bands on the over-time
-          charts show &plusmn;1 standard error; whiskers on the comparison
-          charts show a wider &plusmn;1.96 (a 95% interval). Each
-          comparison chart also notes whether the normal-vs-near-zero gap
-          is likely more than noise (a formal test of whether the two
-          estimates differ).</li>
-        <li><b>Paper this extends:</b> Kiley, M. T. (2016), "Monetary
-          Policy Statements, Treasury Yields, and Private Yields: Before
-          and After the Zero Lower Bound," <i>Finance Research Letters</i>,
-          18, 285&ndash;290.</li>
-      </ul>
-    </section>
+    <footer class="methodology">
+      <div class="disclaimer">For informational purposes only. All downloads and calculations are the author&rsquo;s own and may contain errors &mdash; don&rsquo;t rely on this for decisions or conclusions. Verify independently with your own data and calculations before using it for any purpose.</div>
+      <div><b>Data</b> &mdash; Fed&#8209;meeting surprises from the <a href="https://www.frbsf.org/research-and-insights/data-and-indicators/us-monetary-policy-event-study-database/" target="_blank" rel="noopener">US Monetary Policy Event&#8209;Study Database</a>, 1994&ndash;present. A few announcements with no rate surprise attached are dropped, as are the six COVID&#8209;shock meetings in March&ndash;April 2020, whose moves were extreme outliers.</div>
+      <div><b>Corporate &amp; Treasury yields</b> &mdash; daily <a href="https://fred.stlouisfed.org/series/DGS10" target="_blank" rel="noopener">10&#8209;year</a> and <a href="https://fred.stlouisfed.org/series/DGS20" target="_blank" rel="noopener">20&#8209;year</a> Treasury, Moody&rsquo;s <a href="https://fred.stlouisfed.org/series/DAAA" target="_blank" rel="noopener">Aaa</a> and <a href="https://fred.stlouisfed.org/series/DBAA" target="_blank" rel="noopener">Baa</a> corporate yields, from <a href="https://fred.stlouisfed.org/" target="_blank" rel="noopener">FRED</a> (Federal Reserve Bank of St. Louis).</div>
+      <div><b>Near&#8209;zero rates, two ways</b> &mdash; &ldquo;official dates&rdquo; is simply when the Fed&rsquo;s target rate was at zero. &ldquo;Market&#8209;based&rdquo; instead looks at how actively short&#8209;term rates were being priced, since markets sometimes started expecting a move before &mdash; or kept expecting one after &mdash; the official change.</div>
+      <div><b>Why a 20&#8209;year Treasury for corporate bonds</b> &mdash; following Kiley (2016), whose own check found the 20&#8209;year yield explains corporate&#8209;bond moves much better than the 10&#8209;year does, especially since 2008.</div>
+      <div><b>Margins of error</b> &mdash; the shaded bands on the over&#8209;time charts show &plusmn;1 standard error; whiskers on the comparison charts show a wider &plusmn;1.96 (a 95% interval). Each comparison chart also notes whether the normal&#8209;vs&#8209;near&#8209;zero gap is likely more than noise (a formal test of whether the two estimates differ).</div>
+      <div class="references-block">
+        <div class="references-label">References</div>
+        <div>Acosta, Ajello, Bauer, Loria &amp; Miranda&#8209;Agrippino (2025), &ldquo;Financial Market Effects of FOMC Communication,&rdquo; Federal Reserve Bank of San Francisco Working Paper 2025&#8209;30. &mdash; event&#8209;study database.</div>
+        <div>M.T. Kiley (2016), &ldquo;Monetary Policy Statements, Treasury Yields, and Private Yields: Before and After the Zero Lower Bound,&rdquo; <i>Finance Research Letters</i>, 18, 285&ndash;290. &mdash; paper this tab extends.</div>
+      </div>
+    </footer>
   </section>
 
-  <footer>
+  <footer class="run-info">
     <span id="foot-run"></span>
   </footer>
 
@@ -693,7 +627,7 @@ function renderTimeChart(svg, tooltip, dates, series, opts) {
   });
 
   // hover
-  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, opacity: 0 });
+  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-muted)', 'stroke-width': 1, opacity: 0 });
   svg.appendChild(hoverLine);
   const dots = series.map(s => { const c = el('circle', { r: 3.5, fill: s.color, opacity: 0 }); svg.appendChild(c); return c; });
   const overlay = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' });
@@ -741,7 +675,7 @@ function renderDotWhisker(container, title, note, points) {
   wrap.appendChild(h3);
   if (note) {
     const p = document.createElement('div');
-    p.style.fontSize = '0.76rem'; p.style.color = 'var(--ink-faint)'; p.style.marginBottom = '0.4rem';
+    p.style.fontSize = '0.76rem'; p.style.color = 'var(--ink-muted)'; p.style.marginBottom = '0.4rem';
     p.textContent = note;
     wrap.appendChild(p);
   }
@@ -781,7 +715,7 @@ function renderDotWhisker(container, title, note, points) {
     svg.appendChild(el('rect', {
       x: cx - (labelText.length * 3.4 + 3), y: labelY - 9,
       width: labelText.length * 6.8 + 6, height: 13,
-      fill: 'var(--surface)',
+      fill: 'var(--surface-card)',
     }));
     const vlbl = el('text', {
       x: cx, y: labelY, class: 'axis-label', 'text-anchor': 'middle',
@@ -865,7 +799,7 @@ function renderStepChart(svg, tooltip, series, opts) {
 
   if (opts.todayLine) {
     const tx = x(toT(opts.todayLine));
-    svg.appendChild(el('line', { x1: tx, x2: tx, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, 'stroke-dasharray': '2,2' }));
+    svg.appendChild(el('line', { x1: tx, x2: tx, y1: padT, y2: H - padB, stroke: 'var(--ink-muted)', 'stroke-width': 1, 'stroke-dasharray': '2,2' }));
     const lbl = el('text', { x: tx, y: padT + 10, class: 'axis-label', 'text-anchor': 'middle' });
     lbl.textContent = opts.todayLabel || 'today';
     svg.appendChild(lbl);
@@ -901,7 +835,7 @@ function renderStepChart(svg, tooltip, series, opts) {
     for (const p of pts) { if (toT(p.t) > t) break; v = p.v; }
     return v;
   };
-  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, opacity: 0 });
+  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-muted)', 'stroke-width': 1, opacity: 0 });
   svg.appendChild(hoverLine);
   const overlay = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' });
   svg.appendChild(overlay);
@@ -1086,7 +1020,7 @@ function renderBarChart(svg, tooltip, dates, series, opts) {
     }
   });
 
-  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-faint)', 'stroke-width': 1, opacity: 0 });
+  const hoverLine = el('line', { x1: 0, x2: 0, y1: padT, y2: H - padB, stroke: 'var(--ink-muted)', 'stroke-width': 1, opacity: 0 });
   svg.appendChild(hoverLine);
   const overlay = el('rect', { x: padL, y: padT, width: W - padL - padR, height: H - padT - padB, fill: 'transparent' });
   svg.appendChild(overlay);
@@ -1148,12 +1082,12 @@ function renderScatter(svg, tooltip, data, opts) {
 
   // axis titles
   if (opts.xLabel) {
-    const xt = el('text', { x: (padL + W - padR) / 2, y: H - 6, 'text-anchor': 'middle', class: 'axis-label', 'font-size': '11px', 'font-weight': '600', fill: 'var(--ink-soft)' });
+    const xt = el('text', { x: (padL + W - padR) / 2, y: H - 6, 'text-anchor': 'middle', class: 'axis-label', 'font-size': '11px', 'font-weight': '600', fill: 'var(--ink-secondary)' });
     xt.textContent = opts.xLabel;
     svg.appendChild(xt);
   }
   if (opts.yLabel) {
-    const yt = el('text', { x: 14, y: (padT + H - padB) / 2, 'text-anchor': 'middle', class: 'axis-label', 'font-size': '11px', 'font-weight': '600', fill: 'var(--ink-soft)', transform: `rotate(-90 14 ${(padT + H - padB) / 2})` });
+    const yt = el('text', { x: 14, y: (padT + H - padB) / 2, 'text-anchor': 'middle', class: 'axis-label', 'font-size': '11px', 'font-weight': '600', fill: 'var(--ink-secondary)', transform: `rotate(-90 14 ${(padT + H - padB) / 2})` });
     yt.textContent = opts.yLabel;
     svg.appendChild(yt);
   }
