@@ -5,10 +5,12 @@ on:
     paths:
       - 'cme_derived/**'
   schedule:
-    # 11:00 UTC daily -- after the CME-derived push typically lands, and
-    # catches USMPD updates (roughly 8x/year, around FOMC meetings) and
-    # daily FRED series even on days with no CME update.
-    - cron: '0 11 * * 1-5'
+    # 13:43 UTC weekdays (9:43am EDT / 8:43am EST). The CME-derived push
+    # triggers its own rebuild whenever it lands (see push: above); this run
+    # catches USMPD updates (roughly 8x/year, around FOMC meetings) and daily
+    # FRED series on days with no CME update. Off the top of the hour, when
+    # GitHub delays or drops scheduled runs.
+    - cron: '43 13 * * 1-5'
   workflow_dispatch: {}
 
 permissions:
