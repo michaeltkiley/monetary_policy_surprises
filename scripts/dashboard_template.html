@@ -151,6 +151,27 @@
     white-space: nowrap; z-index: 5;
   }
   .chart-wrap { position: relative; }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: flex-start;
+    padding: 14px 18px; background: var(--surface-card); border: 1px solid var(--rule);
+    border-radius: 12px; box-shadow: var(--shadow);
+  }
+  .controls[hidden] { display: none; }
+  .ctl { display: flex; flex-direction: column; gap: 4px; }
+  .ctl label {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--ink-muted); font-weight: 600;
+  }
+  .ctl input[type=date] {
+    font: inherit; font-size: 0.9rem; padding: 5px 8px; border: 1px solid var(--rule);
+    border-radius: 6px; background: var(--surface-card); color: var(--ink); color-scheme: light dark;
+  }
+  .ctl input[type=date]:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+  .linkbtn {
+    font: inherit; font-size: 0.8rem; border: 0; background: none; color: var(--accent-text);
+    padding: 2px 0; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 2px;
+  }
+  .linkbtn[hidden] { display: none; }
   .roll-stack { display: flex; flex-direction: column; gap: 1.4rem; }
   .chart-sub-label {
     font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 0.82rem;
@@ -267,12 +288,18 @@
   </nav>
 
   <section class="tab-panel active" id="tab-expectations">
+    <div class="controls" id="exp-controls" hidden>
+      <div class="ctl"><label for="exp-main">Pricing on</label><input type="date" id="exp-main"><button type="button" class="linkbtn" id="exp-main-reset" hidden></button></div>
+      <div class="ctl"><label for="exp-cmp">Compare with</label><input type="date" id="exp-cmp"><button type="button" class="linkbtn" id="exp-cmp-reset" hidden></button></div>
+    </div>
+
     <section class="card">
       <h2>Where markets expect the fed funds rate to go</h2>
       <p class="card-note">
         The actual rate over the past month, plus what Fed funds futures are
         pricing in for the months ahead, compared across two dates so you
-        can see how expectations have shifted (see legend for exact dates).
+        can see how expectations have shifted (see legend for exact dates;
+        pick any two above).
       </p>
       <div class="chart-wrap">
         <svg class="chart" id="chart-ff-path" viewBox="0 0 960 340" preserveAspectRatio="xMidYMid meet"></svg>
@@ -533,6 +560,10 @@ function fmtDate(d) {
 function fmtDateShort(d) {
   const dt = new Date(d + 'T00:00:00');
   return dt.toLocaleDateString('en-US', { year: '2-digit', month: 'short', day: 'numeric' });
+}
+function fmtDateMed(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 function fmtDateFull(d) {
   const dt = new Date(d + 'T00:00:00');
@@ -890,14 +921,14 @@ function renderProbBars(svg, tooltip, curPdf, prevPdf, curLabel, prevLabel) {
   }
   const rMin = rates[0] - bsz, rMax = rates[rates.length - 1] + bsz;
   const allProbs = rates.flatMap(r => [curMap.get(r.toFixed(3)) || 0, prevMap.get(r.toFixed(3)) || 0]);
-  const vMax = Math.max(...allProbs, 1) * 1.15;
+  // scale to the rounded-up top tick, not the raw max, so that tick stays inside the plot
+  const { ticks: tickVals, niceMax: vMax, decimals } = niceTicks(0, Math.max(...allProbs, 1) * 1.15, 5);
 
   const x = r => padL + (r - rMin) / (rMax - rMin) * (W - padL - padR);
   const y = p => padT + (1 - p / vMax) * (H - padT - padB);
   const barW = Math.max((x(rMin + bsz) - x(rMin)) * 0.78, 3);
   const yBase = H - padB;
 
-  const { ticks: tickVals, decimals } = niceTicks(0, vMax, 5);
   tickVals.forEach(v => {
     const yy = y(v);
     svg.appendChild(el('line', { x1: padL, x2: W - padR, y1: yy, y2: yy, class: 'grid-line' }));
@@ -1169,15 +1200,10 @@ function renderScatter(svg, tooltip, data, opts) {
 // ==================== TAB 0: Rate Expectations ====================
 (function () {
   const te = DATA.tab_expectations;
-  const curLabel = fmtDateFull(te.current_date);
-  const prevLabel = fmtDateFull(te.previous_date);
-
-  document.getElementById('leg-ff-current').textContent = curLabel;
-  document.getElementById('leg-ff-previous').textContent = prevLabel;
-  document.getElementById('leg-pdf3mo-current').textContent = curLabel;
-  document.getElementById('leg-pdf3mo-previous').textContent = prevLabel;
-  document.getElementById('leg-pdfdecny-current').textContent = curLabel;
-  document.getElementById('leg-pdfdecny-previous').textContent = prevLabel;
+  // history (every settlement date's slice, compactly encoded -- see
+  // lib_cme.py) backs the two date pickers; without it, only the default
+  // current/previous pair in te itself can be shown and the pickers stay hidden
+  const hist = te.history;
 
   // A snapshot's front-month contract can start well before the chart's
   // own left edge (e.g. a "priced last month" snapshot's front contract
@@ -1191,35 +1217,170 @@ function renderScatter(svg, tooltip, data, opts) {
     return atOrAfter;
   }
 
-  const tMin = te.effr_dates[0];
-  const history = te.effr_dates.map((d, i) => ({ t: d, v: te.effr_rate[i] }));
-  const curPath = clipStepSeries(te.ff_path_current.map(p => ({ t: p.start, v: p.rate })), tMin);
-  const prevPath = clipStepSeries(te.ff_path_previous.map(p => ({ t: p.start, v: p.rate })), tMin);
+  // date arithmetic on 'YYYY-MM-DD' strings, mirroring the Python side:
+  // monthsBefore clips the day to the target month's end, like
+  // pd.DateOffset(months=n); throughDate and the two contract rules are
+  // 04_export_dashboard_json.py's through / next_quarterly_at_least(d, 3) /
+  // dec_next_year, so the default dates pick the same contracts as latest.json
+  const ymd = (y, m, d) => `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const parts = s => s.split('-').map(Number);
+  function monthsBefore(s, n) {
+    let [y, m, d] = parts(s);
+    m -= n;
+    while (m < 1) { m += 12; y -= 1; }
+    return ymd(y, m, Math.min(d, new Date(Date.UTC(y, m, 0)).getUTCDate()));
+  }
+  function monthsAfter(s, n) {
+    let [y, m] = parts(s);
+    m += n;
+    while (m > 12) { m -= 12; y += 1; }
+    return ymd(y, m, 1);
+  }
+  const throughDate = s => `${parts(s)[0] + 1}-12-31`;
+  const ABBR = Object.keys(MONTH_NAMES_FULL);
+  function contract3mo(s) {
+    let [y, m] = parts(s);
+    m += 3;
+    y += Math.floor((m - 1) / 12);
+    m = (m - 1) % 12 + 1;
+    while (m % 3 !== 0) { m += 1; if (m > 12) { m = 1; y += 1; } }
+    return ABBR[m - 1] + String(y).slice(2);
+  }
+  const contractDecNy = s => 'DEC' + String(parts(s)[0] + 1).slice(2);
 
-  renderStepChart(
-    document.getElementById('chart-ff-path'),
-    document.getElementById('tt-ff-path'),
-    [
-      { name: 'Actual rate', color: 'var(--s3)', points: history },
-      { name: curLabel, color: 'var(--s1)', points: curPath, extend: true },
-      { name: prevLabel, color: 'var(--s2)', dashed: true, points: prevPath, extend: true },
-    ],
-    { tMin, tMax: te.through, todayLine: te.current_date, todayLabel: fmtDateShort(te.current_date), includeZero: false }
-  );
+  function ffPath(d) {
+    if (hist) {
+      const enc = hist.ff_paths[d];
+      if (!enc) return [];
+      return enc[1].map((v, i) => ({ t: monthsAfter(enc[0], i), v }));
+    }
+    const raw = d === te.current_date ? te.ff_path_current : d === te.previous_date ? te.ff_path_previous : [];
+    return raw.map(p => ({ t: p.start, v: p.rate }));
+  }
+  function pdf(contract, d) {
+    if (hist) {
+      const enc = (hist.pdfs[contract] || {})[d];
+      if (!enc) return null;
+      const [r0, bucket, probs] = enc;
+      return { rates: probs.map((_, i) => r0 + i * bucket), probs, bucket };
+    }
+    const which = d === te.current_date ? 'current' : 'previous';
+    return contract === te.contract_3mo ? te['pdf_3mo_' + which] : te['pdf_dec_ny_' + which];
+  }
 
-  document.getElementById('pdf3mo-h2').textContent =
-    `Rate probabilities, ${fmtContract(te.contract_3mo)}`;
-  renderProbBars(
-    document.getElementById('chart-pdf-3mo'), document.getElementById('tt-pdf-3mo'),
-    te.pdf_3mo_current, te.pdf_3mo_previous, curLabel, prevLabel
-  );
+  // each date's distribution is bucketed on its own (0.25 or 0.5, by how
+  // spread out it is); when two dates differ, re-bucket the finer one onto
+  // the coarser grid (0.5 bins centered on x.25/x.75, as lib.bucket_probs
+  // does) so the bars line up
+  function rebucket(p, bsz) {
+    const m = new Map();
+    p.rates.forEach((r, i) => {
+      const c = (Math.floor(r / bsz) * bsz + bsz / 2).toFixed(3);
+      m.set(c, (m.get(c) || 0) + p.probs[i]);
+    });
+    const rates = [...m.keys()].map(Number).sort((a, b) => a - b);
+    return { rates, probs: rates.map(r => m.get(r.toFixed(3))), bucket: bsz };
+  }
+  function sameBuckets([a, b]) {
+    if (!a || !b || a.bucket === b.bucket) return [a, b];
+    const bsz = Math.max(a.bucket, b.bucket);
+    return [a.bucket < bsz ? rebucket(a, bsz) : a, b.bucket < bsz ? rebucket(b, bsz) : b];
+  }
 
-  document.getElementById('pdfdecny-h2').textContent =
-    `Rate probabilities, ${fmtContract(te.contract_dec_ny)}`;
-  renderProbBars(
-    document.getElementById('chart-pdf-decny'), document.getElementById('tt-pdf-decny'),
-    te.pdf_dec_ny_current, te.pdf_dec_ny_previous, curLabel, prevLabel
-  );
+  // latest.json's own rule for the comparison date: the first settlement
+  // date in the calendar month before the main date (else the earliest on file)
+  function defaultCompare(main) {
+    const ym = monthsBefore(main.slice(0, 7) + '-01', 1).slice(0, 7);
+    return hist.dates.find(d => d.slice(0, 7) === ym) || hist.dates[0];
+  }
+  // a date with no settlement (weekend, holiday) snaps back to the last one before it
+  function snap(d) {
+    const ds = hist.dates;
+    if (d <= ds[0]) return ds[0];
+    let r = ds[0];
+    for (const x of ds) { if (x > d) break; r = x; }
+    return r;
+  }
+
+  function render(mainDate, cmpDate) {
+    const curLabel = fmtDateFull(mainDate);
+    const prevLabel = fmtDateFull(cmpDate);
+    const c3 = contract3mo(mainDate), cDec = contractDecNy(mainDate);
+    let pdf3Cur = pdf(c3, mainDate), pdf3Prev = pdf(c3, cmpDate);
+    let pdfDecCur = pdf(cDec, mainDate), pdfDecPrev = pdf(cDec, cmpDate);
+    const withNote = (label, p) => p ? label : `${label} (no options data)`;
+    [[pdf3Cur, pdf3Prev], [pdfDecCur, pdfDecPrev]] = [[pdf3Cur, pdf3Prev], [pdfDecCur, pdfDecPrev]].map(sameBuckets);
+
+    document.getElementById('leg-ff-current').textContent = curLabel;
+    document.getElementById('leg-ff-previous').textContent = prevLabel;
+    document.getElementById('leg-pdf3mo-current').textContent = withNote(curLabel, pdf3Cur);
+    document.getElementById('leg-pdf3mo-previous').textContent = withNote(prevLabel, pdf3Prev);
+    document.getElementById('leg-pdfdecny-current').textContent = withNote(curLabel, pdfDecCur);
+    document.getElementById('leg-pdfdecny-previous').textContent = withNote(prevLabel, pdfDecPrev);
+
+    const cutoff = monthsBefore(mainDate, te.effr_history_months || 1);
+    const history = te.effr_dates
+      .map((d, i) => ({ t: d, v: te.effr_rate[i] }))
+      .filter(p => p.t >= cutoff && p.t <= mainDate);
+    const tMin = history.length ? history[0].t : cutoff;
+    const tMax = [throughDate(mainDate), throughDate(cmpDate)].sort()[1];
+    const curPath = clipStepSeries(ffPath(mainDate), tMin);
+    const prevPath = clipStepSeries(ffPath(cmpDate), tMin);
+
+    renderStepChart(
+      document.getElementById('chart-ff-path'),
+      document.getElementById('tt-ff-path'),
+      [
+        { name: 'Actual rate', color: 'var(--s3)', points: history },
+        { name: curLabel, color: 'var(--s1)', points: curPath, extend: true },
+        { name: prevLabel, color: 'var(--s2)', dashed: true, points: prevPath, extend: true },
+      ],
+      { tMin, tMax, todayLine: mainDate, todayLabel: fmtDateShort(mainDate), includeZero: false }
+    );
+
+    document.getElementById('pdf3mo-h2').textContent =
+      `Rate probabilities, ${fmtContract(c3)}`;
+    renderProbBars(
+      document.getElementById('chart-pdf-3mo'), document.getElementById('tt-pdf-3mo'),
+      pdf3Cur, pdf3Prev, curLabel, prevLabel
+    );
+
+    document.getElementById('pdfdecny-h2').textContent =
+      `Rate probabilities, ${fmtContract(cDec)}`;
+    renderProbBars(
+      document.getElementById('chart-pdf-decny'), document.getElementById('tt-pdf-decny'),
+      pdfDecCur, pdfDecPrev, curLabel, prevLabel
+    );
+  }
+
+  if (!hist) { render(te.current_date, te.previous_date); return; }
+
+  // the comparison date follows the main date (same rule as the default)
+  // until it's picked by hand
+  const state = { main: te.current_date, cmp: te.previous_date, cmpAuto: true };
+  const first = hist.dates[0], last = hist.dates[hist.dates.length - 1];
+  const mainInp = document.getElementById('exp-main'), cmpInp = document.getElementById('exp-cmp');
+  const mainBtn = document.getElementById('exp-main-reset'), cmpBtn = document.getElementById('exp-cmp-reset');
+  for (const inp of [mainInp, cmpInp]) { inp.min = first; inp.max = last; }
+
+  function update() {
+    if (state.cmpAuto) state.cmp = defaultCompare(state.main);
+    mainInp.value = state.main;
+    cmpInp.value = state.cmp;
+    mainBtn.hidden = state.main === te.current_date;
+    mainBtn.textContent = `Reset to latest (${fmtDateMed(te.current_date)})`;
+    const def = defaultCompare(state.main);
+    cmpBtn.hidden = state.cmpAuto;
+    cmpBtn.textContent = `Reset to start of prior month (${fmtDateMed(def)})`;
+    render(state.main, state.cmp);
+  }
+  mainInp.onchange = () => { if (mainInp.value) state.main = snap(mainInp.value); update(); };
+  cmpInp.onchange = () => { if (cmpInp.value) { state.cmp = snap(cmpInp.value); state.cmpAuto = false; } update(); };
+  mainBtn.onclick = () => { state.main = te.current_date; update(); };
+  cmpBtn.onclick = () => { state.cmpAuto = true; update(); };
+
+  document.getElementById('exp-controls').hidden = false;
+  update();
 })();
 
 // ==================== TAB 1: Policy Surprises ====================

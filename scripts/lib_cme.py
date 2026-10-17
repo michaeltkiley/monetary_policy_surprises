@@ -11,11 +11,17 @@ Carlson-Craig-Melick math and contract-selection logic this module used to
 run directly against a local checkout of ../../cme_tests, and pushes just
 this JSON here on each update. See that repo's README for the full chain
 (Gmail -> Drive -> GitHub -> this file).
+
+Alongside it, ../cme_derived/history.json holds the same slice for every
+settlement date on file (compactly encoded -- see that repo's
+04_export_dashboard_json.py), for the Rate Expectations tab's date pickers.
+It's optional: without it the tab shows just the latest.json pair.
 """
 import json
 from pathlib import Path
 
 CME_DERIVED_PATH = Path(__file__).parent.parent / "cme_derived" / "latest.json"
+CME_HISTORY_PATH = CME_DERIVED_PATH.with_name("history.json")
 
 
 def load() -> dict:
@@ -25,3 +31,9 @@ def load() -> dict:
             "cme-rate-data private repo's export workflow."
         )
     return json.loads(CME_DERIVED_PATH.read_text())
+
+
+def load_history() -> dict | None:
+    if not CME_HISTORY_PATH.exists():
+        return None
+    return json.loads(CME_HISTORY_PATH.read_text())

@@ -138,22 +138,29 @@ def build_tab_expectations(data_dir: Path) -> dict:
     'previous' settlement dates) come pre-computed from lib_cme.load() --
     see that module's docstring for where they come from. This function
     just adds the trailing actual-rate history from FRED (DFF), fetched
-    fresh on every run like the rest of this repo's public data."""
+    fresh on every run like the rest of this repo's public data -- far
+    enough back to cover the date pickers' earliest date (history, when
+    lib_cme.load_history() has one), which the page clips to the month
+    before whichever main date is chosen."""
     derived = lib_cme.load()
+    history = lib_cme.load_history()
     current = derived["current_date"]
+    first = history["dates"][0] if history else current
 
     dff_path = latest(data_dir, "*_fred_dff.csv")
     dff = pd.read_csv(dff_path, na_values=".")
     dff.columns = ["date", "rate"]
     dff["date"] = pd.to_datetime(dff["date"])
     dff = dff.dropna(subset=["rate"])
-    cutoff = pd.Timestamp(current) - pd.DateOffset(months=EFFR_HISTORY_MONTHS)
+    cutoff = pd.Timestamp(first) - pd.DateOffset(months=EFFR_HISTORY_MONTHS)
     dff = dff[(dff["date"] >= cutoff) & (dff["date"] <= pd.Timestamp(current))]
 
     return {
         **derived,
         "effr_dates": dff["date"].dt.strftime("%Y-%m-%d").tolist(),
         "effr_rate": [round(float(x), 3) for x in dff["rate"]],
+        "effr_history_months": EFFR_HISTORY_MONTHS,
+        "history": history,
     }
 
 
