@@ -1,26 +1,54 @@
 name: Update monetary policy dashboard
 
 on:
-  push:
-    paths:
-      - 'cme_derived/**'
+  # sent by cme-rate-data's own workflow after each new CME settlement file
+  # is parsed and exported
+  repository_dispatch:
+    types: [cme-data-updated]
   schedule:
-    # 13:43 UTC weekdays (9:43am EDT / 8:43am EST). The CME-derived push
-    # triggers its own rebuild whenever it lands (see push: above); this run
-    # catches USMPD updates (roughly 8x/year, around FOMC meetings) and daily
-    # FRED series on days with no CME update. Off the top of the hour, when
-    # GitHub delays or drops scheduled runs.
+    # 13:43 UTC weekdays (9:43am EDT / 8:43am EST). The CME-derived dispatch
+    # triggers its own rebuild whenever it lands (see repository_dispatch
+    # above); this run catches USMPD updates (roughly 8x/year, around FOMC
+    # meetings) and daily FRED series on days with no CME update. Off the top
+    # of the hour, when GitHub delays or drops scheduled runs.
     - cron: '43 13 * * 1-5'
+  push:
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   update:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+
+      # The CME-derived JSONs (latest.json, history.json) are read from the
+      # private cme-rate-data repo at build time, never committed here: they
+      # ship only inside the deployed page. CME_DATA_PAT is a fine-grained
+      # token with read-only Contents access to that one repo.
+      - uses: actions/checkout@v4
+        with:
+          repository: michaeltkiley/cme-rate-data
+          token: ${{ secrets.CME_DATA_PAT }}
+          path: cme-rate-data
+          sparse-checkout: export
+          sparse-checkout-cone-mode: false
+
+      - run: |
+          mkdir -p cme_derived
+          cp cme-rate-data/export/latest.json cme-rate-data/export/history.json cme_derived/
 
       - uses: actions/setup-python@v5
         with:
@@ -39,14 +67,11 @@ jobs:
           python3 03_build_dashboard_data.py
           python3 04_build_dashboard.py
 
-      - name: Commit updated dashboard if changed
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html
-          git diff --staged --quiet || git commit -m "Update dashboard $(date -u +%Y-%m-%d)"
-          for i in 1 2 3 4 5; do
-            git push && break
-            git pull --rebase --autostash origin main
-          done
-          git push  # fails the step if every retry was rejected
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

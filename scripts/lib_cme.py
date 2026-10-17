@@ -8,9 +8,10 @@ That file is produced and kept up to date by a separate, private repo
 parsed options/futures CSVs, and probs.duckdb -- none of which are public.
 Its own export step (04_export_dashboard_json.py there) runs the same
 Carlson-Craig-Melick math and contract-selection logic this module used to
-run directly against a local checkout of ../../cme_tests, and pushes just
-this JSON here on each update. See that repo's README for the full chain
-(Gmail -> Drive -> GitHub -> this file).
+run directly against a local checkout of ../../cme_tests, and commits it to
+its own export/ on each update; this repo's workflow copies it from there
+into a gitignored cme_derived/ at build time (never committed here). See
+that repo's README for the full chain (Gmail -> Drive -> GitHub -> this file).
 
 Alongside it, ../cme_derived/history.json holds the same slice for every
 settlement date on file (compactly encoded -- see that repo's

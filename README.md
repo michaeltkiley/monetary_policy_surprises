@@ -35,22 +35,25 @@ the accumulating probability database live in a **separate, private** repo
 (`cme-rate-data`), not here — see its README for the full chain (Gmail →
 Drive → GitHub → parse/probs → export).
 
-This repo only receives the small, already-derived slice that repo
-exports: `cme_derived/latest.json` — a market-implied Fed-funds rate path
-and two bucketed SOFR probability distributions — and
-`cme_derived/history.json`, the same slice for every past settlement date,
-which backs the tab's two date pickers (defaults: latest date vs. start of
-the prior month; without the file the pickers are hidden and the default
-pair still shows). No raw settlement prices
-or option strikes ever appear in this (public) repo; see `scripts/lib_cme.py`
-for how it's read. A push of that file (from the private repo's own
-workflow) is one of this repo's two triggers — the other is a daily
-schedule, so the non-CME tabs stay fresh even on days without a CME
-update.
+The build only reads the small, already-derived slice that repo exports:
+`latest.json` — a market-implied Fed-funds rate path and two bucketed SOFR
+probability distributions — and `history.json`, the same slice for every
+past settlement date, which backs the tab's two date pickers (defaults:
+latest date vs. start of the prior month; without the file the pickers are
+hidden and the default pair still shows). Neither is committed here: the
+workflow checks them out of `cme-rate-data/export/` at build time (secret
+`CME_DATA_PAT`, a fine-grained token with read-only Contents access to that
+repo) into a gitignored `cme_derived/`, and deploys the built page straight
+to GitHub Pages (Settings → Pages → Source: GitHub Actions), so the data
+ships only inside the page. No raw settlement prices or option strikes are
+involved; see `scripts/lib_cme.py` for how the files are read. A
+`repository_dispatch` from the private repo's workflow after each CME update
+is one of this repo's triggers — the others are a daily schedule, so the
+non-CME tabs stay fresh even on days without a CME update, and pushes to
+`main`.
 
-To run the full pipeline locally (needs `cme_derived/latest.json` already
-present — copy it from the private repo, or `cme-rate-data`'s own export
-step):
+To run the full pipeline locally (needs `cme_derived/latest.json`, and
+optionally `history.json`, copied from `cme-rate-data/export/`):
 
 ```
 cd scripts

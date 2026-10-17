@@ -2,3 +2,9 @@ data/
 output/
 __pycache__/
 *.pyc
+
+# Built and deployed straight to Pages by .github/workflows/update.yml, never
+# committed: the CME-derived JSONs are fetched from the private cme-rate-data
+# repo at build time, and the page embeds them.
+cme_derived/
+docs/index.html
