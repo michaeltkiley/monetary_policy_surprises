@@ -37,7 +37,11 @@ Drive → GitHub → parse/probs → export).
 
 This repo only receives the small, already-derived slice that repo
 exports: `cme_derived/latest.json` — a market-implied Fed-funds rate path
-and two bucketed SOFR probability distributions. No raw settlement prices
+and two bucketed SOFR probability distributions — and
+`cme_derived/history.json`, the same slice for every past settlement date,
+which backs the tab's two date pickers (defaults: latest date vs. start of
+the prior month; without the file the pickers are hidden and the default
+pair still shows). No raw settlement prices
 or option strikes ever appear in this (public) repo; see `scripts/lib_cme.py`
 for how it's read. A push of that file (from the private repo's own
 workflow) is one of this repo's two triggers — the other is a daily
