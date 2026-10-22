@@ -230,7 +230,9 @@ def main():
     df.loc[non_policy, "regime"] = "excluded_non_policy"
     df["era"] = df["regime"].map(GROUPING)  # NaN for excluded_non_policy
     df["era_ratio"] = df["Date"].map(era_ratio_by_date)
-    df.loc[df["era"].isna(), "era_ratio"] = None  # respect this df's own exclusions
+    # respect this df's own exclusions (where() rather than in-place .loc, which
+    # raises "read-only array" on the mapped column under newer pandas)
+    df["era_ratio"] = df["era_ratio"].where(df["era"].notna(), None)
 
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
     df.to_parquet(out_path, index=False)
