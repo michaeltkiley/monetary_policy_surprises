@@ -8,3 +8,6 @@ __pycache__/
 # repo at build time, and the page embeds them.
 cme_derived/
 docs/index.html
+
+# Reference papers (publisher copies) kept locally only
+*.pdf
