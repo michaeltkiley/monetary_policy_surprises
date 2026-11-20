@@ -73,5 +73,11 @@ jobs:
         with:
           path: docs
 
+      # deploy-pages looks the artifact up through the API immediately after
+      # upload; the listing can lag a moment ("Found 0 artifact(s)") even
+      # though the upload succeeded. A short pause avoids that race.
+      - name: Wait for artifact to become listable
+        run: sleep 20
+
       - id: deployment
         uses: actions/deploy-pages@v4
