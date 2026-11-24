@@ -16,6 +16,7 @@ scripts/00_fetch_fred_corporate.py  FRED: DGS10/DGS20/DAAA/DBAA
 scripts/05_fetch_fred_dff.py        FRED: daily effective fed funds rate
 scripts/06_fetch_dtcc_ois.py        DTCC public swap tape: cache OIS trades (see DTCC section)
 scripts/07_build_dtcc_ois_curves.py OIS expected-rate paths + SOFR OIS par curve from that cache
+scripts/08_fit_dtcc_ois_spline.py   smooth (penalized B-spline) SOFR OIS forward curve to 5Y from the par curve
 scripts/01_load_full_sample.py      builds the full-history event panel + era classification
 scripts/02_production_estimates.py  IV-GMM pass-through estimates (equity, corporate)
 scripts/03_build_dashboard_data.py  assembles the dashboard JSON payload
@@ -45,6 +46,16 @@ annual SOFR OIS forwards from 1Y to 10Y), `dtcc_expected_path_daily.csv`
 `dtcc_sofr_par_daily.csv` (2Y/5Y/10Y/30Y etc.), `dtcc_meeting_calendar.csv`.
 `python3 07_build_dtcc_ois_curves.py --report` prints coverage, package-vs-
 outright, forecast-error-vs-realized-EFFR and SOFR-OIS-vs-Treasury diagnostics.
+
+**Spline fit (`08_fit_dtcc_ois_spline.py`):** fits a smooth instantaneous
+forward curve to the 6M-10Y SOFR OIS par rates (repricing them; median error
+~2bp) and writes quarterly 3M forwards 0-5Y to `dtcc_fitted_curve_daily.csv`.
+It is deliberately smooth, so it does not follow meeting-by-meeting steps in
+the first ~6 months -- intended to pair with a near-term step path (e.g. CME
+fed funds futures) and to supply the 1-5Y horizon. Against meeting-dated fed
+funds OIS (not used in the fit) it differs by ~5-10bp (mean |diff|); the
+penalty weight `--lam` is a judgment (x10 stiffer moves 3-5Y forwards by ~4-9bp).
+`--report` prints these diagnostics.
 
 Testing-grade caveats: the combined curve has no node for roughly months 6-12
 (meeting nodes thin out; the annual forwards start at 1Y); SOFR OIS is
