@@ -14,6 +14,7 @@ after the zero lower bound.
 scripts/00_fetch_usmpd.py           SF Fed: US Monetary Policy Event-Study Database
 scripts/00_fetch_fred_corporate.py  FRED: DGS10/DGS20/DAAA/DBAA
 scripts/05_fetch_fred_dff.py        FRED: daily effective fed funds rate
+scripts/06_fetch_dtcc_ois.py        DTCC public swap tape: daily USD SOFR OIS closes by tenor
 scripts/01_load_full_sample.py      builds the full-history event panel + era classification
 scripts/02_production_estimates.py  IV-GMM pass-through estimates (equity, corporate)
 scripts/03_build_dashboard_data.py  assembles the dashboard JSON payload
@@ -24,6 +25,16 @@ scripts/04_build_dashboard.py       injects it into dashboard_template.html -> d
 all pull full-history, public data on every run — same idempotent,
 stateless pattern as the [termprem](https://github.com/michaeltkiley/termprem)
 tracker.
+
+## DTCC OIS fetcher (experimental, not yet in the dashboard)
+
+`06_fetch_dtcc_ois.py` builds a daily SOFR OIS curve (median fixed rate per
+tenor over a 3-5pm ET closing window) from DTCC's free public swap-trade
+tape. These are trades, not dealer quotes: closing-window samples are thin
+at short tenors (`close` is blank below `--min-trades`), and fed funds OIS is
+too sparse to use. DTCC retains only a rolling ~2 years of files, so the
+script caches each day's filtered trades under `data/dtcc/` -- run it
+regularly to build an archive. Output: `data/dtcc_sofr_ois_daily.csv`.
 
 ## The Rate Expectations tab is different
 
