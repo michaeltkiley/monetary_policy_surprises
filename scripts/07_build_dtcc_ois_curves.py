@@ -51,7 +51,7 @@ import pandas as pd
 WINDOWS = [("15:00", "17:00"), ("13:00", "17:00"), ("00:00", "24:00")]
 OFF_MARKET_BP_PAR = 15   # drop par-curve trades >15bp from the day/tenor median
 OFF_MARKET_BP_FWD = 15   # same for meeting-interval trades
-TENORS = {"6M": 0.5, "9M": 0.75, "1Y": 1, "18M": 1.5, "2Y": 2, "3Y": 3, "4Y": 4, "5Y": 5, "7Y": 7,
+TENORS = {"1M": 1 / 12, "3M": 0.25, "6M": 0.5, "9M": 0.75, "1Y": 1, "18M": 1.5, "2Y": 2, "3Y": 3, "4Y": 4, "5Y": 5, "7Y": 7,
           "10Y": 10, "15Y": 15, "20Y": 20, "30Y": 30}
 
 
