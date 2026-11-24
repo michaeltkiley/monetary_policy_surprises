@@ -12,6 +12,9 @@ Outputs (in --data-dir):
                                   forwards, fed funds OIS preferred, SOFR OIS
                                   (basis-adjusted to EFFR) where fed funds is thin
   dtcc_sofr_par_daily.csv         SOFR OIS par curve (spot-starting, by tenor)
+  dtcc_expected_curve_daily.csv   TEST combined curve: EFFR now, meeting nodes to
+                                  ~1Y (fed funds OIS), annual SOFR OIS forwards
+                                  from 1Y out to --max-years
 
 Method
   * Trade date = execution date in America/New_York; "close" = median over the
@@ -46,6 +49,8 @@ import numpy as np
 import pandas as pd
 
 WINDOWS = [("15:00", "17:00"), ("13:00", "17:00"), ("00:00", "24:00")]
+OFF_MARKET_BP_PAR = 15   # drop par-curve trades >15bp from the day/tenor median
+OFF_MARKET_BP_FWD = 15   # same for meeting-interval trades
 TENORS = {"1Y": 1, "18M": 1.5, "2Y": 2, "3Y": 3, "4Y": 4, "5Y": 5, "7Y": 7,
           "10Y": 10, "15Y": 15, "20Y": 20, "30Y": 30}
 
@@ -102,6 +107,19 @@ def time_mask(t, w):
     return (t["mins"] >= h0 * 60 + m0) & (t["mins"] < h1 * 60 + m1)
 
 
+def drop_off_market(t, keys, thr_bp, min_group=5):
+    """Drop trades far from their own (day, bucket) all-day median.
+
+    The tape contains off-market-coupon swaps (ladders at a fixed rate well away
+    from par, 8-15% coupons, etc.) that would otherwise contaminate medians on
+    thin buckets. Groups with fewer than min_group trades are left untouched
+    (no reference to judge against)."""
+    ref = t.groupby(keys)["rate_pct"].transform("median")
+    cnt = t.groupby(keys)["rate_pct"].transform("size")
+    bad = (cnt >= min_group) & ((t["rate_pct"] - ref).abs() * 100 > thr_bp)
+    return t[~bad]
+
+
 def window_median(t, keys, min_trades):
     """Per-key median/count over the narrow window, widening if too thin."""
     out = []
@@ -146,7 +164,11 @@ def meeting_forwards(t, meetings, min_trades, exclude_packages):
     # for stub, key on end meeting only (start varies by trade); for meeting use both
     allt["start_key"] = np.where(allt["kind"] == "stub", pd.NaT, allt["start"])
     allt["start_key"] = pd.to_datetime(allt["start_key"])
-    res = window_median(allt, ["date", "product", "kind", "end_key", "start_key"], min_trades)
+    keys = ["date", "product", "kind", "end_key", "start_key"]
+    allt = drop_off_market(allt.assign(start_key=allt["start_key"].fillna(pd.Timestamp(0))),
+                           keys, OFF_MARKET_BP_FWD)
+    allt["start_key"] = allt["start_key"].replace(pd.Timestamp(0), pd.NaT)
+    res = window_median(allt, keys, min_trades)
     res = res.rename(columns={"end_key": "end", "start_key": "start"})
     return res
 
@@ -164,6 +186,7 @@ def par_curve(t, min_trades):
     s["tenor"] = lab
     s = s.dropna(subset=["tenor"])
     s = s[s["rate_pct"].between(-1, 15)]
+    s = drop_off_market(s, ["date", "tenor"], OFF_MARKET_BP_PAR)
     res = window_median(s, ["date", "tenor"], min_trades)
     order = {k: i for i, k in enumerate(TENORS)}
     return res.sort_values(["date", "tenor"], key=lambda c: c.map(order) if c.name == "tenor" else c)
@@ -346,6 +369,28 @@ def report(t, fwd, path, basis, data_dir, min_trades):
             n="size", mean="mean", mae=lambda s: s.abs().mean()).round(1).to_string())
 
 
+def build_curve(path, horizon_days=365):
+    """Combined expected-funds-rate test curve, one row per date x segment:
+    node 0 published EFFR; meeting-by-meeting nodes starting within
+    `horizon_days` (fed funds OIS preferred, SOFR OIS basis-adjusted where fed
+    funds is thin); then annual SOFR OIS forwards from year 1 onward
+    (EFFR-equivalent via a short-end basis -- an assumption for long horizons)."""
+    now = path[path["meeting_no"] == 0].copy()
+    now["horizon_start"], now["horizon_end"] = now["date"], now["date"]
+    m = path[(path["meeting_no"] >= 1)
+             & ((path["node_start"] - path["date"]).dt.days <= horizon_days)].copy()
+    m["horizon_start"], m["horizon_end"] = m["node_start"], m["node_end"]
+    a = path[path["fwd_start_yrs"].notna() & (path["fwd_start_yrs"] >= 1)].copy()
+    a["horizon_start"] = a["date"] + pd.to_timedelta(a["fwd_start_yrs"] * 365.25, unit="D")
+    a["horizon_end"] = a["date"] + pd.to_timedelta(a["fwd_end_yrs"] * 365.25, unit="D")
+    c = pd.concat([now, m, a], ignore_index=True)
+    c["years_ahead"] = ((c["horizon_start"] - c["date"]).dt.days / 365.25).round(2)
+    c = c.rename(columns={"exp_rate": "expected_rate_pct", "basis": "basis_used_pct"})
+    cols = ["date", "node", "horizon_start", "horizon_end", "years_ahead",
+            "expected_rate_pct", "source", "window", "n_trades", "basis_used_pct"]
+    return c[cols].sort_values(["date", "horizon_start"]).reset_index(drop=True)
+
+
 def forward_report(path, effr):
     f1 = path[path["node"] == "fwd 0Y-1Y"].set_index("date")["exp_rate"]
     rows = []
@@ -415,6 +460,7 @@ def main():
     par.to_csv(dd / "dtcc_sofr_par_daily.csv", index=False)
     path, basis = build_path(fwd, par, meetings, load_effr(dd), args.max_years)
     path.to_csv(dd / "dtcc_expected_path_daily.csv", index=False)
+    build_curve(path).to_csv(dd / "dtcc_expected_curve_daily.csv", index=False)
     print(f"wrote {len(fwd)} forward rows, {len(par)} par rows, {len(path)} path nodes")
     if args.report:
         report(t, fwd, path, basis, dd, args.min_trades)

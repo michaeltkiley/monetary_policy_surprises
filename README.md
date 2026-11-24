@@ -38,11 +38,20 @@ scripts/06_fetch_dtcc_ois.py          fetch + cache every cleared USD SOFR / fed
 scripts/07_build_dtcc_ois_curves.py   derive curves from the cache (re-runnable without refetching)
 ```
 
-Outputs under `data/` (gitignored): `dtcc_expected_path_daily.csv` (one node
-per FOMC interval + longer pillar forwards), `dtcc_meeting_fwd_daily.csv`,
+Outputs under `data/` (gitignored): `dtcc_expected_curve_daily.csv` (TEST
+combined curve: published EFFR, meeting-by-meeting fed funds OIS nodes to ~1Y,
+annual SOFR OIS forwards from 1Y to 10Y), `dtcc_expected_path_daily.csv`
+(all nodes before assembly), `dtcc_meeting_fwd_daily.csv`,
 `dtcc_sofr_par_daily.csv` (2Y/5Y/10Y/30Y etc.), `dtcc_meeting_calendar.csv`.
 `python3 07_build_dtcc_ois_curves.py --report` prints coverage, package-vs-
 outright, forecast-error-vs-realized-EFFR and SOFR-OIS-vs-Treasury diagnostics.
+
+Testing-grade caveats: the combined curve has no node for roughly months 6-12
+(meeting nodes thin out; the annual forwards start at 1Y); SOFR OIS is
+converted to EFFR-equivalent with a short-end basis (~2bp median) that is an
+assumption at long horizons, where forwards also contain term premia; long
+forwards are differenced from interpolated par rates, so day-to-day noise is
+~4-7bp. Off-market-coupon swaps (>15bp from the day/tenor median) are dropped.
 
 Key caveats: DTCC retains only a rolling ~2 years of files, so run `06`
 regularly -- the per-day cache under `data/dtcc/trades/` is the archive.
