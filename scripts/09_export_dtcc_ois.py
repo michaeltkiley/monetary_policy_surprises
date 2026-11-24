@@ -21,6 +21,11 @@ can be compared point for point.
 
 Usage:
     python3 09_export_dtcc_ois.py [--data-dir ../data] [--out-dir ../ois_derived]
+                                  [--out-file PATH]        # overrides --out-dir/history.json
+
+In production this runs in the private cme-rate-data repo's workflow (which also
+stores the raw per-day trades durably) and writes export/ois_history.json; the
+public dashboard build copies that to ois_derived/history.json.
 """
 import argparse
 import importlib.util
@@ -51,6 +56,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="../data")
     ap.add_argument("--out-dir", default="../ois_derived")
+    ap.add_argument("--out-file", default=None, help="exact output path (default <out-dir>/history.json)")
     ap.add_argument("--lam", type=float, default=0.3)
     ap.add_argument("--lam-near", type=float, default=0.003)
     args = ap.parse_args()
@@ -82,9 +88,8 @@ def main():
         "curves": curves,
         "fomc_dates": [pd.Timestamp(m).strftime("%Y-%m-%d") for m in meet],
     }
-    out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    p = out_dir / "history.json"
+    p = Path(args.out_file) if args.out_file else Path(args.out_dir) / "history.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(out, separators=(",", ":")))
     print(f"Wrote {p} ({p.stat().st_size / 1024:.0f} KB): {len(curves)} dates "
           f"{out['dates'][0]}..{out['dates'][-1]}, median fit RMSE "

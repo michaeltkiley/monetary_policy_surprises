@@ -20,8 +20,10 @@ Minimal cleaning at fetch time:
 
 RETENTION: DTCC keeps only a rolling ~2 years of these files (as of Nov 2026
 the oldest was 2024-11-22; older keys return 403). Run this regularly so each
-day is cached before the source file expires -- the cache in dtcc/trades/ is
-the archive.
+day is cached before the source file expires. In production the private
+cme-rate-data repo's ois-capture workflow does this and stores each day's
+trades durably (data/ois/trades/*.csv.gz); a local --data-dir cache is only a
+working copy.
 
 Usage:
     python3 06_fetch_dtcc_ois.py --start 2024-11-22 [--end YYYY-MM-DD]

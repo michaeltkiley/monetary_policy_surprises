@@ -4,7 +4,7 @@ on:
   # sent by cme-rate-data's own workflow after each new CME settlement file
   # is parsed and exported
   repository_dispatch:
-    types: [cme-data-updated]
+    types: [cme-data-updated, ois-data-updated]
   schedule:
     # 13:43 UTC weekdays (9:43am EDT / 8:43am EST). The CME-derived dispatch
     # triggers its own rebuild whenever it lands (see repository_dispatch
@@ -49,32 +49,17 @@ jobs:
       - run: |
           mkdir -p cme_derived
           cp cme-rate-data/export/latest.json cme-rate-data/export/history.json cme_derived/
+          # OIS-implied curve history (DTCC swap tape), captured and stored durably in
+          # cme-rate-data by its ois-capture workflow. Optional: without it the
+          # dashboard shows the CME charts alone.
+          mkdir -p ois_derived
+          cp cme-rate-data/export/ois_history.json ois_derived/history.json || echo "no OIS history yet"
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - run: pip install -r requirements.txt
-
-      # OIS-implied curve from DTCC's public swap tape. DTCC keeps only ~2 years of
-      # files, so the per-day trade cache is restored from (and saved to) the
-      # Actions cache: each run fetches only days not yet cached. If the cache is
-      # ever evicted the next run re-fetches the available two years.
-      - uses: actions/cache@v4
-        with:
-          path: data/dtcc
-          key: dtcc-trades-${{ github.run_id }}
-          restore-keys: dtcc-trades-
-
-      # best-effort: if the DTCC steps fail, the dashboard still builds, with the
-      # CME charts alone (lib_ois.load_history() returns None without the file)
-      - name: OIS curve from DTCC swap data
-        continue-on-error: true
-        working-directory: scripts
-        run: |
-          python3 06_fetch_dtcc_ois.py --start 2024-11-22
-          python3 07_build_dtcc_ois_curves.py
-          python3 09_export_dtcc_ois.py
 
       - name: Run pipeline
         working-directory: scripts

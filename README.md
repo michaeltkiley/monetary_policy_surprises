@@ -40,9 +40,10 @@ scripts/06_fetch_dtcc_ois.py          fetch + cache every cleared USD SOFR / fed
 scripts/07_build_dtcc_ois_curves.py   derive curves from the cache (re-runnable without refetching)
 ```
 
-**On the dashboard:** when `ois_derived/history.json` exists (built by `06`, `07`,
-`09` in the workflow, restored from an Actions cache of `data/dtcc` so only new days
-are fetched; best-effort -- a failure just leaves the CME charts alone), the Rate
+**On the dashboard:** when `ois_derived/history.json` exists (copied at build time
+from the private `cme-rate-data` repo's `export/ois_history.json`, which its
+`ois-capture` workflow produces by running `06`, `07` and `09` against the DTCC
+trade history it stores durably; if absent, the tab shows the CME charts alone), the Rate
 Expectations tab shows the futures chart and an OIS-implied 5-year curve side by
 side on a shared y-scale and the same two date pickers. Extras: quick-compare chips
 (1 week / 1 month / before last FOMC), left/right arrow keys step the pricing date,
@@ -84,8 +85,10 @@ assumption at long horizons, where forwards also contain term premia; long
 forwards are differenced from interpolated par rates, so day-to-day noise is
 ~4-7bp. Off-market-coupon swaps (>15bp from the day/tenor median) are dropped.
 
-Key caveats: DTCC retains only a rolling ~2 years of files, so run `06`
-regularly -- the per-day cache under `data/dtcc/trades/` is the archive.
+Key caveats: DTCC retains only a rolling ~2 years of files, so they are captured
+daily and stored durably in the private `cme-rate-data` repo (`data/ois/trades/`,
+gzip, ~16 MB/year); this repo holds only the scripts, and running `06` locally just
+builds a local cache under `data/dtcc/trades/`.
 Meeting-dated swaps are mostly fed funds OIS; coverage thins beyond ~4
 meetings (SOFR-OIS par pillars take over). Fed funds OIS is preferred and SOFR
 OIS is basis-adjusted to EFFR where it is thin. Closing window is 3-5pm ET,
