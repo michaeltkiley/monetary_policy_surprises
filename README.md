@@ -17,6 +17,7 @@ scripts/05_fetch_fred_dff.py        FRED: daily effective fed funds rate
 scripts/06_fetch_dtcc_ois.py        DTCC public swap tape: cache OIS trades (see DTCC section)
 scripts/07_build_dtcc_ois_curves.py OIS expected-rate paths + SOFR OIS par curve from that cache
 scripts/08_fit_dtcc_ois_spline.py   fitted expected-funds-rate curve: spline with knots at each meeting + longer knots
+scripts/09_export_dtcc_ois.py       exports the fitted curve history to ois_derived/history.json for the dashboard
 scripts/01_load_full_sample.py      builds the full-history event panel + era classification
 scripts/02_production_estimates.py  IV-GMM pass-through estimates (equity, corporate)
 scripts/03_build_dashboard_data.py  assembles the dashboard JSON payload
@@ -28,7 +29,7 @@ all pull full-history, public data on every run — same idempotent,
 stateless pattern as the [termprem](https://github.com/michaeltkiley/termprem)
 tracker.
 
-## DTCC OIS curves (experimental, not yet in the dashboard)
+## DTCC OIS curves (in the Rate Expectations tab; experimental)
 
 Free, end-of-day OIS-based alternatives to the CME-based expected-rate paths,
 built from DTCC's public swap-trade tape (`pddata.dtcc.com`, CFTC public price
@@ -38,6 +39,18 @@ dissemination). These are *trades*, not dealer quotes.
 scripts/06_fetch_dtcc_ois.py          fetch + cache every cleared USD SOFR / fed funds OIS trade, per day
 scripts/07_build_dtcc_ois_curves.py   derive curves from the cache (re-runnable without refetching)
 ```
+
+**On the dashboard:** when `ois_derived/history.json` exists (built by `06`, `07`,
+`09` in the workflow, restored from an Actions cache of `data/dtcc` so only new days
+are fetched; best-effort -- a failure just leaves the CME charts alone), the Rate
+Expectations tab shows the futures chart and an OIS-implied 5-year curve side by
+side on a shared y-scale and the same two date pickers. Extras: quick-compare chips
+(1 week / 1 month / before last FOMC), left/right arrow keys step the pricing date,
+and an "Overlay OIS curve on futures chart" toggle that draws the OIS curve as
+translucent bands under the futures steps and turns the second card into an
+OIS-minus-futures difference chart (bp). Dates before the OIS data begins show the
+CME chart alone with a note. `lib_ois.py` is the loader; `03_build_dashboard_data.py`
+adds the history and an FOMC-date list to the payload.
 
 Outputs under `data/` (gitignored): `dtcc_expected_curve_daily.csv` (TEST
 combined curve: published EFFR, meeting-by-meeting fed funds OIS nodes to ~1Y,

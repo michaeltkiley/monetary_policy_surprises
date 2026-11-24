@@ -11,3 +11,5 @@ docs/index.html
 
 # Reference papers (publisher copies) kept locally only
 *.pdf
+
+ois_derived/

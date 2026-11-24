@@ -172,6 +172,26 @@
     padding: 2px 0; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 2px;
   }
   .linkbtn[hidden] { display: none; }
+  .ctl[hidden] { display: none; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font: inherit; font-size: 0.8rem; padding: 5px 10px; border: 1px solid var(--rule);
+    border-radius: 999px; background: var(--surface-card); color: var(--ink-secondary); cursor: pointer;
+  }
+  .chip:hover:not(:disabled) { border-color: var(--s1); color: var(--ink); }
+  .chip:disabled { opacity: 0.45; cursor: default; }
+  .chip:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: var(--ink); padding-top: 4px; cursor: pointer; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--s1); cursor: pointer; }
+  .ctl-hint { font-size: 0.75rem; color: var(--ink-muted); }
+  .pair { display: grid; grid-template-columns: 1fr; gap: 1.75rem; align-items: stretch; }
+  @media (min-width: 900px) {
+    .pair.two { grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    .pair.two section.card { padding: 1.4rem 1.2rem 1.6rem; }
+  }
+  @media (min-width: 900px) { .pair.two .card-note { min-height: 4.6em; } }
+  .legend .sw.wide { width: 18px; height: 7px; border-radius: 4px; vertical-align: 1px; }
+  .chart-msg { font-size: 0.9rem; color: var(--ink-muted); padding: 2.2rem 0.5rem; text-align: center; }
   .roll-stack { display: flex; flex-direction: column; gap: 1.4rem; }
   .chart-sub-label {
     font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 0.82rem;
@@ -314,11 +334,26 @@
     <div class="controls" id="exp-controls" hidden>
       <div class="ctl"><label for="exp-main">Pricing on</label><input type="date" id="exp-main"><button type="button" class="linkbtn" id="exp-main-reset" hidden></button></div>
       <div class="ctl"><label for="exp-cmp">Compare with</label><input type="date" id="exp-cmp"><button type="button" class="linkbtn" id="exp-cmp-reset" hidden></button></div>
+      <div class="ctl" id="exp-chips-wrap">
+        <label>Quick compare</label>
+        <div class="chips">
+          <button type="button" class="chip" data-q="week">1 week ago</button>
+          <button type="button" class="chip" data-q="month">1 month ago</button>
+          <button type="button" class="chip" data-q="fomc">Before last FOMC</button>
+        </div>
+        <span class="ctl-hint">&larr; &rarr; keys step the pricing date one day</span>
+      </div>
+      <div class="ctl" id="exp-overlay-wrap" hidden>
+        <label for="exp-overlay">View</label>
+        <label class="toggle"><input type="checkbox" id="exp-overlay"> Overlay OIS curve on futures chart</label>
+      </div>
     </div>
+
+    <div class="pair" id="exp-pair">
 
     <section class="card">
       <h2>Where markets expect the fed funds rate to go</h2>
-      <p class="card-note">
+      <p class="card-note" id="ff-note">
         The actual rate over the past month, plus what Fed funds futures are
         pricing in for the months ahead, compared across two dates so you
         can see how expectations have shifted (see legend for exact dates;
@@ -332,8 +367,25 @@
         <span><span class="sw" style="background:var(--s3)"></span>Actual rate</span>
         <span><span class="sw" style="background:var(--s1)"></span>Priced <span id="leg-ff-current"></span></span>
         <span><span class="sw" style="background:var(--s2)"></span>Priced <span id="leg-ff-previous"></span></span>
+        <span id="leg-ff-ovl" hidden><span class="sw wide" style="background:var(--ink-muted);opacity:0.35"></span>Translucent band: OIS curve, same dates</span>
       </div>
     </section>
+
+    <section class="card" id="card-ois" hidden>
+      <h2 id="ois-h2">OIS-implied path, next five years</h2>
+      <p class="card-note" id="ois-note"></p>
+      <div class="chart-wrap">
+        <svg class="chart" id="chart-ois" viewBox="0 0 960 340" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="tt-ois"></div>
+      </div>
+      <div class="chart-msg" id="ois-msg" hidden></div>
+      <div class="legend" id="ois-legend">
+        <span id="leg-ois-actual"><span class="sw" style="background:var(--s3)"></span>Actual rate</span>
+        <span><span class="sw" style="background:var(--s1)"></span><span id="leg-ois-current"></span></span>
+        <span><span class="sw" style="background:var(--s2)"></span><span id="leg-ois-previous"></span></span>
+      </div>
+    </section>
+    </div>
 
     <section class="card">
       <h2 id="pdf3mo-h2">Rate probabilities, next contract 3+ months out</h2>
@@ -836,7 +888,7 @@ function niceTicks(min, max, targetCount) {
 // last priced contract is still short of the chart's right edge)
 function renderStepChart(svg, tooltip, series, opts) {
   opts = opts || {};
-  const W = 960, H = svg.viewBox.baseVal.height || 340;
+  const W = opts.width || 960, H = opts.height || svg.viewBox.baseVal.height || 340;
   const padL = 46, padR = 16, padT = 16, padB = 30;
   svg.innerHTML = '';
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -848,6 +900,7 @@ function renderStepChart(svg, tooltip, series, opts) {
   const tMax = toT(opts.tMax);
 
   let rawMin = Math.min(...allPts.map(p => p.v)), rawMax = Math.max(...allPts.map(p => p.v));
+  if (opts.yRange) { rawMin = opts.yRange[0]; rawMax = opts.yRange[1]; }
   if (opts.includeZero !== false) { rawMin = Math.min(rawMin, 0); rawMax = Math.max(rawMax, 0); }
   const { ticks: tickVals, niceMin, niceMax, decimals } = niceTicks(rawMin, rawMax, 5);
   const vMin = niceMin, vMax = niceMax;
@@ -867,12 +920,13 @@ function renderStepChart(svg, tooltip, series, opts) {
   if (opts.todayLine) {
     const tx = x(toT(opts.todayLine));
     svg.appendChild(el('line', { x1: tx, x2: tx, y1: padT, y2: H - padB, stroke: 'var(--ink-muted)', 'stroke-width': 1, 'stroke-dasharray': '2,2' }));
-    const lbl = el('text', { x: tx, y: padT + 10, class: 'axis-label', 'text-anchor': 'middle' });
+    const nearLeft = tx < padL + 45;
+    const lbl = el('text', { x: nearLeft ? tx + 5 : tx, y: padT + 10, class: 'axis-label', 'text-anchor': nearLeft ? 'start' : 'middle' });
     lbl.textContent = opts.todayLabel || 'today';
     svg.appendChild(lbl);
   }
 
-  const nXLabels = 6;
+  const nXLabels = W < 700 ? 4 : 6;
   for (let t = 0; t <= nXLabels; t++) {
     const tt = tMin + (t / nXLabels) * (tMax - tMin);
     const anchor = t === 0 ? 'start' : (t === nXLabels ? 'end' : 'middle');
@@ -886,18 +940,34 @@ function renderStepChart(svg, tooltip, series, opts) {
     if (!pts.length) return;
     let d = `M${x(toT(pts[0].t))},${y(pts[0].v)} `;
     for (let i = 1; i < pts.length; i++) {
-      d += `L${x(toT(pts[i].t))},${y(pts[i - 1].v)} L${x(toT(pts[i].t))},${y(pts[i].v)} `;
+      d += s.line
+        ? `L${x(toT(pts[i].t))},${y(pts[i].v)} `   // smooth/linear series (e.g. OIS curve)
+        : `L${x(toT(pts[i].t))},${y(pts[i - 1].v)} L${x(toT(pts[i].t))},${y(pts[i].v)} `;
     }
     if (s.extend) d += `L${x(tMax)},${y(pts[pts.length - 1].v)} `;
     svg.appendChild(el('path', {
-      d, fill: 'none', stroke: s.color, 'stroke-width': 2,
+      d, fill: 'none', stroke: s.color, 'stroke-width': s.width || 2,
       'stroke-dasharray': s.dashed ? '6,3' : 'none',
+      'stroke-linejoin': 'round', 'stroke-linecap': s.opacity ? 'round' : 'butt',
+      opacity: s.opacity !== undefined ? s.opacity : 1,
     }));
   });
 
   // hover: step-function value of each series at the cursor's time
-  const valueAt = (pts, t) => {
+  const valueAt = (pts, t, line) => {
     if (!pts.length || t < toT(pts[0].t)) return null;
+    if (line) {   // linear interpolation; nothing past the last point
+      const last = pts[pts.length - 1];
+      if (t > toT(last.t)) return null;
+      for (let i = 1; i < pts.length; i++) {
+        const t1 = toT(pts[i].t);
+        if (t <= t1) {
+          const t0 = toT(pts[i - 1].t);
+          return t1 === t0 ? pts[i].v : pts[i - 1].v + (pts[i].v - pts[i - 1].v) * (t - t0) / (t1 - t0);
+        }
+      }
+      return last.v;
+    }
     let v = pts[0].v;
     for (const p of pts) { if (toT(p.t) > t) break; v = p.v; }
     return v;
@@ -913,8 +983,9 @@ function renderStepChart(svg, tooltip, series, opts) {
     hoverLine.setAttribute('x1', x(t)); hoverLine.setAttribute('x2', x(t)); hoverLine.setAttribute('opacity', 1);
     const lines = [fmtDate(new Date(t).toISOString().slice(0, 10))];
     series.forEach(s => {
-      const v = valueAt(s.points, t);
-      if (v !== null) lines.push(`${s.name}: ${v.toFixed(opts.tooltipDecimals !== undefined ? opts.tooltipDecimals : 2)}%`);
+      if (s.noHover) return;
+      const v = valueAt(s.points, t, s.line);
+      if (v !== null) lines.push(`${s.name}: ${v.toFixed(opts.tooltipDecimals !== undefined ? opts.tooltipDecimals : 2)}${opts.unit || '%'}`);
     });
     tooltip.innerHTML = lines.join('<br>');
     tooltip.style.opacity = 1;
@@ -1228,6 +1299,17 @@ function renderScatter(svg, tooltip, data, opts) {
   // current/previous pair in te itself can be shown and the pickers stay hidden
   const hist = te.history;
 
+  // OIS-implied curve history (DTCC swap tape), optional. Each date's curve is
+  // [v0, v1, ..., vN] in `unit` percent: v0 starts on that date, v_k on the first
+  // day of the k-th following month -- the same monthly grid as the CME path.
+  const ois = hist ? te.ois : null;
+  const oisOn = !!ois;
+  const fomcDates = te.fomc_dates || [];
+  const wideMq = window.matchMedia('(min-width: 900px)');
+  let overlayOn = false;
+  let redraw = () => {};
+  const ffNoteDefault = document.getElementById('ff-note').textContent;
+
   // A snapshot's front-month contract can start well before the chart's
   // own left edge (e.g. a "priced last month" snapshot's front contract
   // started weeks before "today minus one month"). Left-censor at tMin:
@@ -1325,6 +1407,98 @@ function renderScatter(svg, tooltip, data, opts) {
     return r;
   }
 
+  // an OIS date with no fit (weekend, holiday) snaps back to the last one before it;
+  // before the first fitted date there is no OIS curve
+  function snapOis(d) {
+    const ds = ois.dates;
+    if (d < ds[0]) return null;
+    let r = ds[0];
+    for (const x of ds) { if (x > d) break; r = x; }
+    return r;
+  }
+  function oisPath(d) {
+    const sd = ois && snapOis(d);
+    if (!sd) return null;
+    return { date: sd, points: ois.curves[sd].map((v, k) => ({ t: k === 0 ? sd : monthsAfter(sd, k), v: v * ois.unit })) };
+  }
+  const dayMs = s => new Date(s + 'T00:00:00').getTime();
+  function lineAt(pts, tStr) {   // linear interpolation on [{t, v}] by date string
+    const t = dayMs(tStr);
+    if (!pts.length || t < dayMs(pts[0].t) || t > dayMs(pts[pts.length - 1].t)) return null;
+    for (let i = 1; i < pts.length; i++) {
+      const t1 = dayMs(pts[i].t);
+      if (t <= t1) {
+        const t0 = dayMs(pts[i - 1].t);
+        return t1 === t0 ? pts[i].v : pts[i - 1].v + (pts[i].v - pts[i - 1].v) * (t - t0) / (t1 - t0);
+      }
+    }
+    return pts[pts.length - 1].v;
+  }
+  function clipLine(pts, tMaxStr) {
+    const out = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].t <= tMaxStr) { out.push(pts[i]); continue; }
+      const v = lineAt(pts, tMaxStr);
+      if (v !== null && out.length) out.push({ t: tMaxStr, v });
+      break;
+    }
+    return out;
+  }
+  function addDays(s, n) {
+    const [y, m, d] = parts(s);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+  }
+
+  function renderOisCard(c) {
+    const svg = document.getElementById('chart-ois'), tt = document.getElementById('tt-ois');
+    const msg = document.getElementById('ois-msg'), legend = document.getElementById('ois-legend');
+    const firstOis = fmtDateMed(ois.dates[0]);
+    const note = (label, o) => o ? label : `${label} (no OIS data before ${firstOis})`;
+    document.getElementById('leg-ois-actual').hidden = c.overlay;
+    const setLegend = (cur, prev) => {
+      document.getElementById('leg-ois-current').textContent = cur;
+      document.getElementById('leg-ois-previous').textContent = prev;
+    };
+
+    if (c.overlay) {
+      document.getElementById('ois-h2').textContent = 'OIS minus futures, by month';
+      document.getElementById('ois-note').textContent =
+        'How far the OIS-implied curve sits above (+) or below (−) Fed funds futures for each month, in basis points. Part of any gap is method (swap trades versus futures settlements, the SOFR-to-fed-funds adjustment); a gap that grows or changes sign between dates is the signal.';
+      const diff = (d, o) => {
+        if (!o) return [];
+        const pts = [];
+        for (const p of ffPath(d)) {
+          const v = lineAt(o.points, p.t);
+          if (v !== null && p.t <= c.tMax) pts.push({ t: p.t, v: (v - p.v) * 100 });
+        }
+        return pts;
+      };
+      const dCur = diff(c.mainDate, c.oisCur), dPrev = diff(c.cmpDate, c.oisPrev);
+      setLegend(note('OIS − futures, ' + c.curLabel, c.oisCur), note('OIS − futures, ' + c.prevLabel, c.oisPrev));
+      if (!dCur.length && !dPrev.length) { svg.hidden = true; msg.hidden = false; msg.textContent = `No OIS data for the selected dates (it begins ${firstOis}).`; return; }
+      svg.hidden = false; msg.hidden = true;
+      renderStepChart(svg, tt, [
+        { name: 'OIS − futures, ' + c.curLabel, color: 'var(--s1)', points: dCur, line: true },
+        { name: 'OIS − futures, ' + c.prevLabel, color: 'var(--s2)', dashed: true, points: dPrev, line: true },
+      ], { tMin: [c.mainDate, c.cmpDate].sort()[0], tMax: c.tMax, todayLine: c.mainDate, todayLabel: fmtDateShort(c.mainDate),
+           unit: ' bp', tooltipDecimals: 0, ...c.dims });
+      return;
+    }
+
+    document.getElementById('ois-h2').textContent = 'OIS-implied path, next five years';
+    document.getElementById('ois-note').textContent =
+      'The same question answered from interest-rate swap trades (SOFR and fed funds OIS, as reported to DTCC), smoothed into one curve and expressed as an effective-fed-funds equivalent. It reaches further out than the futures chart; beyond about a year it also reflects a term premium, and the months around 6–12 out are the least certain.';
+    setLegend(note('OIS ' + c.curLabel, c.oisCur), note('OIS ' + c.prevLabel, c.oisPrev));
+    const lastT = [c.oisCur, c.oisPrev].filter(Boolean).map(o => o.points[o.points.length - 1].t).sort().pop();
+    if (!lastT) { svg.hidden = true; msg.hidden = false; msg.textContent = `No OIS data for the selected dates (it begins ${firstOis}).`; return; }
+    svg.hidden = false; msg.hidden = true;
+    const series = [{ name: 'Actual rate', color: 'var(--s3)', points: c.history }];
+    if (c.oisCur) series.push({ name: 'OIS ' + c.curLabel, color: 'var(--s1)', points: c.oisCur.points, line: true, width: 2.4 });
+    if (c.oisPrev) series.push({ name: 'OIS ' + c.prevLabel, color: 'var(--s2)', dashed: true, points: c.oisPrev.points, line: true, width: 2.4 });
+    renderStepChart(svg, tt, series,
+      { tMin: c.tMin, tMax: lastT, todayLine: c.mainDate, todayLabel: fmtDateShort(c.mainDate), includeZero: false, yRange: c.yRange, ...c.dims });
+  }
+
   function render(mainDate, cmpDate) {
     const curLabel = fmtDateFull(mainDate);
     const prevLabel = fmtDateFull(cmpDate);
@@ -1347,19 +1521,47 @@ function renderScatter(svg, tooltip, data, opts) {
       .filter(p => p.t >= cutoff && p.t <= mainDate);
     const tMin = history.length ? history[0].t : cutoff;
     const tMax = [throughDate(mainDate), throughDate(cmpDate)].sort()[1];
-    const curPath = clipStepSeries(ffPath(mainDate), tMin);
-    const prevPath = clipStepSeries(ffPath(cmpDate), tMin);
+    const curPath = clipStepSeries(ffPath(mainDate), tMin).filter(p => p.t <= tMax);
+    const prevPath = clipStepSeries(ffPath(cmpDate), tMin).filter(p => p.t <= tMax);
+
+    // layout: with OIS data the tab shows two cards side by side (stacked on
+    // narrow screens); the overlay toggle draws the OIS curve on the futures
+    // chart and turns the second card into an OIS-minus-futures difference chart
+    const sbs = oisOn && wideMq.matches;
+    const overlay = oisOn && overlayOn;
+    const dims = sbs ? { width: 520, height: 360 } : {};
+    const oisCur = oisOn ? oisPath(mainDate) : null, oisPrev = oisOn ? oisPath(cmpDate) : null;
+
+    const cmeSeries = [
+      { name: 'Actual rate', color: 'var(--s3)', points: history },
+      { name: curLabel, color: 'var(--s1)', points: curPath, extend: true },
+      { name: prevLabel, color: 'var(--s2)', dashed: true, points: prevPath, extend: true },
+    ];
+    if (overlay) {   // translucent bands underneath the futures steps
+      if (oisPrev) cmeSeries.unshift({ name: 'OIS ' + prevLabel, color: 'var(--s2)', points: clipLine(oisPrev.points, tMax), line: true, width: 7, opacity: 0.25 });
+      if (oisCur) cmeSeries.unshift({ name: 'OIS ' + curLabel, color: 'var(--s1)', points: clipLine(oisCur.points, tMax), line: true, width: 7, opacity: 0.25 });
+    }
+    let yRange = null;   // side by side, no overlay: one shared y-scale for both charts
+    if (sbs && !overlay) {
+      const all = cmeSeries.flatMap(x => x.points.map(p => p.v))
+        .concat([oisCur, oisPrev].filter(Boolean).flatMap(o => o.points.map(p => p.v)));
+      yRange = [Math.min(...all), Math.max(...all)];
+    }
 
     renderStepChart(
       document.getElementById('chart-ff-path'),
       document.getElementById('tt-ff-path'),
-      [
-        { name: 'Actual rate', color: 'var(--s3)', points: history },
-        { name: curLabel, color: 'var(--s1)', points: curPath, extend: true },
-        { name: prevLabel, color: 'var(--s2)', dashed: true, points: prevPath, extend: true },
-      ],
-      { tMin, tMax, todayLine: mainDate, todayLabel: fmtDateShort(mainDate), includeZero: false }
+      cmeSeries,
+      { tMin, tMax, todayLine: mainDate, todayLabel: fmtDateShort(mainDate), includeZero: false, yRange, ...dims }
     );
+
+    document.getElementById('exp-pair').classList.toggle('two', oisOn);
+    document.getElementById('card-ois').hidden = !oisOn;
+    document.getElementById('leg-ff-ovl').hidden = !overlay;
+    document.getElementById('ff-note').textContent = overlay
+      ? 'The actual rate over the past month and what Fed funds futures are pricing in (lines), with the OIS-implied curve for the same two dates drawn as translucent bands underneath, so you can see where the two sources agree.'
+      : ffNoteDefault;
+    if (oisOn) renderOisCard({ mainDate, cmpDate, curLabel, prevLabel, history, tMin, tMax, oisCur, oisPrev, overlay, yRange, dims });
 
     document.getElementById('pdf3mo-h2').textContent =
       `Rate probabilities, ${fmtContract(c3)}`;
@@ -1376,6 +1578,8 @@ function renderScatter(svg, tooltip, data, opts) {
     );
   }
 
+  redraw = () => render(te.current_date, te.previous_date);
+  wideMq.addEventListener('change', () => redraw());
   if (!hist) { render(te.current_date, te.previous_date); return; }
 
   // the comparison date follows the main date (same rule as the default)
@@ -1401,6 +1605,50 @@ function renderScatter(svg, tooltip, data, opts) {
   cmpInp.onchange = () => { if (cmpInp.value) { state.cmp = snap(cmpInp.value); state.cmpAuto = false; } update(); };
   mainBtn.onclick = () => { state.main = te.current_date; update(); };
   cmpBtn.onclick = () => { state.cmpAuto = true; update(); };
+
+  redraw = update;
+
+  // quick-compare chips set the comparison date relative to the pricing date
+  const chipsWrap = document.getElementById('exp-chips-wrap');
+  function chipTarget(kind) {
+    if (kind === 'week') return snap(addDays(state.main, -7));
+    if (kind === 'month') return snap(monthsBefore(state.main, 1));
+    if (kind === 'fomc') {   // the settlement just before the most recent FOMC decision day
+      const f = fomcDates.filter(x => x <= state.main).pop();
+      if (!f) return null;
+      const before = hist.dates.filter(x => x < f).pop();
+      return before || null;
+    }
+    return null;
+  }
+  chipsWrap.querySelectorAll('.chip').forEach(b => {
+    b.onclick = () => {
+      const t = chipTarget(b.dataset.q);
+      if (!t) return;
+      state.cmp = t; state.cmpAuto = false; update();
+    };
+  });
+  const syncChips = () => chipsWrap.querySelectorAll('.chip').forEach(b => { b.disabled = !chipTarget(b.dataset.q); });
+  const baseUpdate = update;
+  redraw = update = () => { baseUpdate(); syncChips(); };   // chips depend on the pricing date
+
+  // overlay toggle (only meaningful when OIS data is present)
+  const ovlWrap = document.getElementById('exp-overlay-wrap'), ovlBox = document.getElementById('exp-overlay');
+  ovlWrap.hidden = !oisOn;
+  ovlBox.onchange = () => { overlayOn = ovlBox.checked; update(); };
+
+  // left/right arrows step the pricing date one settlement day (not while typing in a field)
+  document.addEventListener('keydown', ev => {
+    if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+    if (!document.getElementById('tab-expectations').classList.contains('active')) return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    const j = hist.dates.indexOf(state.main) + (ev.key === 'ArrowLeft' ? -1 : 1);
+    if (j < 0 || j >= hist.dates.length) return;
+    state.main = hist.dates[j];
+    update();
+    ev.preventDefault();
+  });
 
   document.getElementById('exp-controls').hidden = false;
   update();

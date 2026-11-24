@@ -56,6 +56,26 @@ jobs:
 
       - run: pip install -r requirements.txt
 
+      # OIS-implied curve from DTCC's public swap tape. DTCC keeps only ~2 years of
+      # files, so the per-day trade cache is restored from (and saved to) the
+      # Actions cache: each run fetches only days not yet cached. If the cache is
+      # ever evicted the next run re-fetches the available two years.
+      - uses: actions/cache@v4
+        with:
+          path: data/dtcc
+          key: dtcc-trades-${{ github.run_id }}
+          restore-keys: dtcc-trades-
+
+      # best-effort: if the DTCC steps fail, the dashboard still builds, with the
+      # CME charts alone (lib_ois.load_history() returns None without the file)
+      - name: OIS curve from DTCC swap data
+        continue-on-error: true
+        working-directory: scripts
+        run: |
+          python3 06_fetch_dtcc_ois.py --start 2024-11-22
+          python3 07_build_dtcc_ois_curves.py
+          python3 09_export_dtcc_ois.py
+
       - name: Run pipeline
         working-directory: scripts
         run: |
