@@ -37,6 +37,7 @@ import numpy as np
 import pandas as pd
 
 import lib_cme
+import lib_ois
 from lib_gmm import iv_gmm
 
 PC_COLS = ["ED1", "UST2Y", "UST5Y", "UST30Y"]
@@ -132,7 +133,7 @@ def build_rolling_corporate(df: pd.DataFrame) -> pd.DataFrame:
     })
 
 
-def build_tab_expectations(data_dir: Path) -> dict:
+def build_tab_expectations(data_dir: Path, fomc_dates: list) -> dict:
     """Tab 4: the market's expected path for policy rates. The CME-derived
     pieces (forward curve + SR3 probability distributions for 'current' and
     'previous' settlement dates) come pre-computed from lib_cme.load() --
@@ -155,12 +156,23 @@ def build_tab_expectations(data_dir: Path) -> dict:
     cutoff = pd.Timestamp(first) - pd.DateOffset(months=EFFR_HISTORY_MONTHS)
     dff = dff[(dff["date"] >= cutoff) & (dff["date"] <= pd.Timestamp(current))]
 
+    # OIS-implied curve history (DTCC swap tape; see 06-09). Optional: the tab
+    # falls back to the CME charts alone without it. FOMC dates (for the
+    # "before last FOMC" quick-compare) = scheduled meetings from the event panel
+    # plus the calendar inferred from the swap tape (covers recent/upcoming ones).
+    ois = lib_ois.load_history()
+    fomc = set(fomc_dates)
+    if ois:
+        fomc |= set(ois.get("fomc_dates", []))
+
     return {
         **derived,
         "effr_dates": dff["date"].dt.strftime("%Y-%m-%d").tolist(),
         "effr_rate": [round(float(x), 3) for x in dff["rate"]],
         "effr_history_months": EFFR_HISTORY_MONTHS,
         "history": history,
+        "ois": ois,
+        "fomc_dates": sorted(fomc),
     }
 
 
@@ -253,7 +265,10 @@ def main():
         "roll_aaa_se": [round(float(x), 3) for x in rolling_corp["aaa_se"]],
     }
 
-    tab_expectations = build_tab_expectations(Path(args.data_dir))
+    sched = df[df["Unscheduled"] == 0] if "Unscheduled" in df else df
+    fomc_dates = (sched.loc[sched["Date"] >= "2015-01-01", "Date"]
+                  .dt.strftime("%Y-%m-%d").tolist())
+    tab_expectations = build_tab_expectations(Path(args.data_dir), fomc_dates)
 
     payload = {
         "run_date": args.run_date,
@@ -275,6 +290,9 @@ def main():
     print(f"  tab_expectations: current={tab_expectations['current_date']} "
           f"previous={tab_expectations['previous_date']} "
           f"contracts={tab_expectations['contract_3mo']}/{tab_expectations['contract_dec_ny']}")
+    ois = tab_expectations.get("ois")
+    print(f"  tab_expectations OIS: " + (f"{len(ois['dates'])} dates {ois['dates'][0]}..{ois['dates'][-1]}"
+                                        if ois else "none (CME charts only)"))
 
 
 if __name__ == "__main__":

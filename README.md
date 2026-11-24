@@ -14,6 +14,10 @@ after the zero lower bound.
 scripts/00_fetch_usmpd.py           SF Fed: US Monetary Policy Event-Study Database
 scripts/00_fetch_fred_corporate.py  FRED: DGS10/DGS20/DAAA/DBAA
 scripts/05_fetch_fred_dff.py        FRED: daily effective fed funds rate
+scripts/06_fetch_dtcc_ois.py        DTCC public swap tape: cache OIS trades (see DTCC section)
+scripts/07_build_dtcc_ois_curves.py OIS expected-rate paths + SOFR OIS par curve from that cache
+scripts/08_fit_dtcc_ois_spline.py   fitted expected-funds-rate curve: spline with knots at each meeting + longer knots
+scripts/09_export_dtcc_ois.py       exports the fitted curve history to ois_derived/history.json for the dashboard
 scripts/01_load_full_sample.py      builds the full-history event panel + era classification
 scripts/02_production_estimates.py  IV-GMM pass-through estimates (equity, corporate)
 scripts/03_build_dashboard_data.py  assembles the dashboard JSON payload
@@ -24,6 +28,71 @@ scripts/04_build_dashboard.py       injects it into dashboard_template.html -> d
 all pull full-history, public data on every run — same idempotent,
 stateless pattern as the [termprem](https://github.com/michaeltkiley/termprem)
 tracker.
+
+## DTCC OIS curves (in the Rate Expectations tab; experimental)
+
+Free, end-of-day OIS-based alternatives to the CME-based expected-rate paths,
+built from DTCC's public swap-trade tape (`pddata.dtcc.com`, CFTC public price
+dissemination). These are *trades*, not dealer quotes.
+
+```
+scripts/06_fetch_dtcc_ois.py          fetch + cache every cleared USD SOFR / fed funds OIS trade, per day
+scripts/07_build_dtcc_ois_curves.py   derive curves from the cache (re-runnable without refetching)
+```
+
+**On the dashboard:** when `ois_derived/history.json` exists (copied at build time
+from the private `cme-rate-data` repo's `export/ois_history.json`, which its
+`ois-capture` workflow produces by running `06`, `07` and `09` against the DTCC
+trade history it stores durably; if absent, the tab shows the CME charts alone), the Rate
+Expectations tab shows the futures chart and an OIS-implied 5-year curve side by
+side on a shared y-scale and the same two date pickers. Extras: quick-compare chips
+(1 week / 1 month / before last FOMC), left/right arrow keys step the pricing date,
+and an "Overlay OIS curve on futures chart" toggle that draws the OIS curve as
+translucent bands under the futures steps and turns the second card into an
+OIS-minus-futures difference chart (bp). Dates before the OIS data begins show the
+CME chart alone with a note. `lib_ois.py` is the loader; `03_build_dashboard_data.py`
+adds the history and an FOMC-date list to the payload.
+
+Outputs under `data/` (gitignored): `dtcc_expected_curve_daily.csv` (TEST
+combined curve: published EFFR, meeting-by-meeting fed funds OIS nodes to ~1Y,
+annual SOFR OIS forwards from 1Y to 10Y), `dtcc_expected_path_daily.csv`
+(all nodes before assembly), `dtcc_meeting_fwd_daily.csv`,
+`dtcc_sofr_par_daily.csv` (2Y/5Y/10Y/30Y etc.), `dtcc_meeting_calendar.csv`.
+`python3 07_build_dtcc_ois_curves.py --report` prints coverage, package-vs-
+outright, forecast-error-vs-realized-EFFR and SOFR-OIS-vs-Treasury diagnostics.
+
+**Curve fit (`08_fit_dtcc_ois_spline.py`):** the default `knots` model is a
+single cubic B-spline forward curve with a knot at every FOMC meeting inside
+~13 months (so it can pass through the meeting-dated points) and quarterly /
+annual knots out to 10Y, fit to meeting-dated fed funds and SOFR OIS, spot-
+starting 1M-10Y SOFR OIS par swaps and the published EFFR. The smoothness
+penalty is loose near term (`--lam-near`) and firmer at the long end (`--lam`).
+Alternatives for comparison: `--model hybrid` (meeting steps then spline) and
+`--model smooth` (stiff spline on 6M-10Y par only). Outputs:
+`dtcc_fitted_curve_daily.csv` (quarterly 3M forwards 0-5Y, EFFR-equivalent) and
+`dtcc_fit_diagnostics_daily.csv`. Findings (`--report`): `knots` reprices par to
+~1.2bp and meeting-dated swaps to ~2bp (no step), with few direction reversals
+(median 0, max 3 across 0-15M); error vs realized EFFR is the same as the hybrid
+(0-3M MAE ~3.4bp, 3-6M ~13.5bp) and worse than the stiff spline at 6-12M
+(~24-29bp vs ~20-23bp) -- tight curve fidelity is not forecast skill, and the
+6M-1Y par closes are mostly all-day fallbacks, so humps in months ~6-12 come
+from those pillars. `--lam-near` is a judgment (0.0003-0.03 changes little).
+
+Testing-grade caveats: the combined curve has no node for roughly months 6-12
+(meeting nodes thin out; the annual forwards start at 1Y); SOFR OIS is
+converted to EFFR-equivalent with a short-end basis (~2bp median) that is an
+assumption at long horizons, where forwards also contain term premia; long
+forwards are differenced from interpolated par rates, so day-to-day noise is
+~4-7bp. Off-market-coupon swaps (>15bp from the day/tenor median) are dropped.
+
+Key caveats: DTCC retains only a rolling ~2 years of files, so they are captured
+daily and stored durably in the private `cme-rate-data` repo (`data/ois/trades/`,
+gzip, ~16 MB/year); this repo holds only the scripts, and running `06` locally just
+builds a local cache under `data/dtcc/trades/`.
+Meeting-dated swaps are mostly fed funds OIS; coverage thins beyond ~4
+meetings (SOFR-OIS par pillars take over). Fed funds OIS is preferred and SOFR
+OIS is basis-adjusted to EFFR where it is thin. Closing window is 3-5pm ET,
+widened (flagged in a `window` column) when too few trades.
 
 ## The Rate Expectations tab is different
 
