@@ -28,9 +28,11 @@ Method
   * Fed funds OIS references EFFR; SOFR OIS trades a few bp away. SOFR-based
     intervals are converted to an EFFR-equivalent by subtracting a trailing
     median SOFR-minus-fed-funds basis estimated from intervals where both trade.
-  * Beyond the last meeting node, pillar forwards f(T1,T2) = (r2*T2 - r1*T1) /
-    (T2 - T1) are computed from SOFR OIS par rates (approximation: ignores
-    compounding and discounting convexity), also basis-adjusted.
+  * Beyond the meeting nodes, annual forwards (0-1Y, 1Y-2Y, ... up to --max-years)
+    are bootstrapped from the SOFR OIS par curve (annual fixed leg, act/360,
+    par rates interpolated linearly across tenors), then basis-adjusted. SOFR
+    OIS is far deeper than fed funds OIS beyond ~6 months (hundreds of swaps a
+    day at 2-10Y vs a handful), so this is the long-horizon source.
 
 Usage:
     python3 07_build_dtcc_ois_curves.py [--data-dir ../data] [--min-trades 3]
@@ -46,7 +48,6 @@ import pandas as pd
 WINDOWS = [("15:00", "17:00"), ("13:00", "17:00"), ("00:00", "24:00")]
 TENORS = {"1Y": 1, "18M": 1.5, "2Y": 2, "3Y": 3, "4Y": 4, "5Y": 5, "7Y": 7,
           "10Y": 10, "15Y": 15, "20Y": 20, "30Y": 30}
-PILLARS = ["1Y", "2Y", "3Y", "5Y"]  # used for the longer-dated forward nodes
 
 
 def load_cache(data_dir: Path) -> pd.DataFrame:
@@ -186,7 +187,35 @@ def load_effr(data_dir):
         return None
 
 
-def build_path(fwd, par, meetings, effr=None):
+DELTA = 365 / 360  # act/360 accrual on an annual fixed leg
+
+
+def bootstrap_forwards(par_by_years, max_years):
+    """Annual SOFR OIS forwards from par rates by maturity (years -> percent).
+
+    Par rates are linearly interpolated to a 1Y grid; discount factors are
+    bootstrapped from  S_T * DELTA * sum_{i<=T} D_i = 1 - D_T  (annual fixed
+    leg, act/360); the forward for year k is (D_{k-1}/D_k - 1)/DELTA.
+    Returns (years_end, forward_pct) or None if the curve is too sparse
+    (needs >=4 pillars, the shortest at <=18M, out to at least 2Y)."""
+    pts = sorted(par_by_years.items())
+    if len(pts) < 4 or pts[0][0] > 1.5 or pts[-1][0] < 2:
+        return None
+    ys = [a for a, _ in pts]
+    rs = [b for _, b in pts]
+    n = int(min(max_years, ys[-1]))
+    grid = np.arange(1, n + 1)
+    par = np.interp(grid, ys, rs) / 100
+    D = [1.0]
+    fw = []
+    for k, S in enumerate(par, 1):
+        Dk = (1 - S * DELTA * sum(D[1:])) / (1 + S * DELTA)
+        fw.append((D[k - 1] / Dk - 1) / DELTA * 100)
+        D.append(Dk)
+    return list(grid), fw
+
+
+def build_path(fwd, par, meetings, effr=None, max_years=10):
     """One row per date x node with the expected policy rate (EFFR-equivalent)."""
     f = fwd[fwd["kind"] == "meeting"].copy()
     # meeting node index = position of the interval's start meeting among
@@ -229,20 +258,22 @@ def build_path(fwd, par, meetings, effr=None):
     meet_nodes = piv[["date", "meeting_no", "node", "node_start", "node_end", "ffr",
                       "sofr", "sofr_adj", "exp_rate", "source", "window", "n_trades", "basis"]]
 
-    # pillar forwards from SOFR par
+    # annual forwards bootstrapped from the SOFR OIS par curve
     p = par.pivot_table(index="date", columns="tenor", values="median")
     rows = []
     for d, r in p.iterrows():
         b = basis.get(d, np.nan)
-        for a, c in zip(PILLARS[:-1], PILLARS[1:]):
-            if pd.notna(r.get(a)) and pd.notna(r.get(c)):
-                T1, T2 = TENORS[a], TENORS[c]
-                fwd_r = (r[c] * T2 - r[a] * T1) / (T2 - T1)
-                rows.append({"date": d, "meeting_no": np.nan, "node": f"fwd {a}-{c}",
-                             "node_start": pd.NaT, "node_end": pd.NaT, "ffr": np.nan,
-                             "sofr": fwd_r, "sofr_adj": fwd_r - b, "exp_rate": fwd_r - b,
-                             "source": "sofr_par_fwd_adj", "window": np.nan,
-                             "n_trades": np.nan, "basis": b})
+        boot = bootstrap_forwards({TENORS[k]: v for k, v in r.items()
+                                   if k in TENORS and pd.notna(v)}, max_years)
+        if boot is None:
+            continue
+        for k, fr in zip(*boot):
+            rows.append({"date": d, "meeting_no": np.nan, "node": f"fwd {k-1}Y-{k}Y",
+                         "fwd_start_yrs": k - 1, "fwd_end_yrs": k,
+                         "node_start": pd.NaT, "node_end": pd.NaT, "ffr": np.nan,
+                         "sofr": fr, "sofr_adj": fr - b, "exp_rate": fr - b,
+                         "source": "sofr_par_boot_adj", "window": np.nan,
+                         "n_trades": np.nan, "basis": b})
     pil = pd.DataFrame(rows)
     parts = [meet_nodes, pil]
     if effr is not None:
@@ -251,7 +282,7 @@ def build_path(fwd, par, meetings, effr=None):
         parts.append(pd.DataFrame({"date": dts, "meeting_no": 0, "node": "now (EFFR)",
                                    "exp_rate": cur.to_numpy(), "source": "effr_published"}))
     return pd.concat(parts, ignore_index=True).sort_values(
-        ["date", "meeting_no", "node"]), basis
+        ["date", "meeting_no", "fwd_start_yrs", "node"]), basis
 
 
 def report(t, fwd, path, basis, data_dir, min_trades):
@@ -315,6 +346,28 @@ def report(t, fwd, path, basis, data_dir, min_trades):
             n="size", mean="mean", mae=lambda s: s.abs().mean()).round(1).to_string())
 
 
+def forward_report(path, effr):
+    f1 = path[path["node"] == "fwd 0Y-1Y"].set_index("date")["exp_rate"]
+    rows = []
+    for d, v in f1.items():
+        end = d + pd.Timedelta(days=365)
+        if end > effr.index.max():
+            continue
+        rows.append({"date": d, "err": (v - effr[(effr.index >= d) & (effr.index < end)].mean()) * 100})
+    e = pd.DataFrame(rows)
+    print("\n=== bootstrapped 0-1Y SOFR OIS forward (EFFR-equiv) vs realized mean EFFR over next 365d ===")
+    if len(e):
+        print("n=%d days (overlapping), mean err %.1fbp, MAE %.1fbp, range %.0f..%.0f bp" % (
+            len(e), e["err"].mean(), e["err"].abs().mean(), e["err"].min(), e["err"].max()))
+    last = path[(path["date"] == path["date"].max()) & path["fwd_start_yrs"].notna()]
+    print("latest-day annual forwards (EFFR-equiv %):",
+          ", ".join(f"{int(a)}-{int(b)}Y {v:.2f}" for a, b, v in
+                    zip(last["fwd_start_yrs"], last["fwd_end_yrs"], last["exp_rate"])))
+    cov = (path[path["fwd_start_yrs"].notna()].groupby("fwd_end_yrs")["date"].nunique()
+           / path["date"].nunique()).round(2)
+    print("share of days with each annual forward:", cov.to_dict())
+
+
 def treasury_report(par, data_dir):
     import requests
     out = {}
@@ -345,6 +398,8 @@ def main():
     ap.add_argument("--data-dir", default="../data")
     ap.add_argument("--min-trades", type=int, default=3)
     ap.add_argument("--exclude-packages", action="store_true")
+    ap.add_argument("--max-years", type=int, default=10,
+                    help="longest annual SOFR OIS forward to build (default 10)")
     ap.add_argument("--report", action="store_true")
     args = ap.parse_args()
     dd = Path(args.data_dir)
@@ -358,12 +413,15 @@ def main():
     fwd.to_csv(dd / "dtcc_meeting_fwd_daily.csv", index=False)
     par = par_curve(t, args.min_trades)
     par.to_csv(dd / "dtcc_sofr_par_daily.csv", index=False)
-    path, basis = build_path(fwd, par, meetings, load_effr(dd))
+    path, basis = build_path(fwd, par, meetings, load_effr(dd), args.max_years)
     path.to_csv(dd / "dtcc_expected_path_daily.csv", index=False)
     print(f"wrote {len(fwd)} forward rows, {len(par)} par rows, {len(path)} path nodes")
     if args.report:
         report(t, fwd, path, basis, dd, args.min_trades)
         treasury_report(par, dd)
+        eff = load_effr(dd)
+        if eff is not None:
+            forward_report(path, eff)
 
 
 if __name__ == "__main__":
