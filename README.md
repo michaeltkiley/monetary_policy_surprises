@@ -14,7 +14,8 @@ after the zero lower bound.
 scripts/00_fetch_usmpd.py           SF Fed: US Monetary Policy Event-Study Database
 scripts/00_fetch_fred_corporate.py  FRED: DGS10/DGS20/DAAA/DBAA
 scripts/05_fetch_fred_dff.py        FRED: daily effective fed funds rate
-scripts/06_fetch_dtcc_ois.py        DTCC public swap tape: daily USD SOFR OIS closes by tenor
+scripts/06_fetch_dtcc_ois.py        DTCC public swap tape: cache OIS trades (see DTCC section)
+scripts/07_build_dtcc_ois_curves.py OIS expected-rate paths + SOFR OIS par curve from that cache
 scripts/01_load_full_sample.py      builds the full-history event panel + era classification
 scripts/02_production_estimates.py  IV-GMM pass-through estimates (equity, corporate)
 scripts/03_build_dashboard_data.py  assembles the dashboard JSON payload
@@ -26,15 +27,29 @@ all pull full-history, public data on every run — same idempotent,
 stateless pattern as the [termprem](https://github.com/michaeltkiley/termprem)
 tracker.
 
-## DTCC OIS fetcher (experimental, not yet in the dashboard)
+## DTCC OIS curves (experimental, not yet in the dashboard)
 
-`06_fetch_dtcc_ois.py` builds a daily SOFR OIS curve (median fixed rate per
-tenor over a 3-5pm ET closing window) from DTCC's free public swap-trade
-tape. These are trades, not dealer quotes: closing-window samples are thin
-at short tenors (`close` is blank below `--min-trades`), and fed funds OIS is
-too sparse to use. DTCC retains only a rolling ~2 years of files, so the
-script caches each day's filtered trades under `data/dtcc/` -- run it
-regularly to build an archive. Output: `data/dtcc_sofr_ois_daily.csv`.
+Free, end-of-day OIS-based alternatives to the CME-based expected-rate paths,
+built from DTCC's public swap-trade tape (`pddata.dtcc.com`, CFTC public price
+dissemination). These are *trades*, not dealer quotes.
+
+```
+scripts/06_fetch_dtcc_ois.py          fetch + cache every cleared USD SOFR / fed funds OIS trade, per day
+scripts/07_build_dtcc_ois_curves.py   derive curves from the cache (re-runnable without refetching)
+```
+
+Outputs under `data/` (gitignored): `dtcc_expected_path_daily.csv` (one node
+per FOMC interval + longer pillar forwards), `dtcc_meeting_fwd_daily.csv`,
+`dtcc_sofr_par_daily.csv` (2Y/5Y/10Y/30Y etc.), `dtcc_meeting_calendar.csv`.
+`python3 07_build_dtcc_ois_curves.py --report` prints coverage, package-vs-
+outright, forecast-error-vs-realized-EFFR and SOFR-OIS-vs-Treasury diagnostics.
+
+Key caveats: DTCC retains only a rolling ~2 years of files, so run `06`
+regularly -- the per-day cache under `data/dtcc/trades/` is the archive.
+Meeting-dated swaps are mostly fed funds OIS; coverage thins beyond ~4
+meetings (SOFR-OIS par pillars take over). Fed funds OIS is preferred and SOFR
+OIS is basis-adjusted to EFFR where it is thin. Closing window is 3-5pm ET,
+widened (flagged in a `window` column) when too few trades.
 
 ## The Rate Expectations tab is different
 
