@@ -16,7 +16,7 @@ scripts/00_fetch_fred_corporate.py  FRED: DGS10/DGS20/DAAA/DBAA
 scripts/05_fetch_fred_dff.py        FRED: daily effective fed funds rate
 scripts/06_fetch_dtcc_ois.py        DTCC public swap tape: cache OIS trades (see DTCC section)
 scripts/07_build_dtcc_ois_curves.py OIS expected-rate paths + SOFR OIS par curve from that cache
-scripts/08_fit_dtcc_ois_spline.py   fitted expected-funds-rate curve: meeting steps (~13M) + smooth spline
+scripts/08_fit_dtcc_ois_spline.py   fitted expected-funds-rate curve: spline with knots at each meeting + longer knots
 scripts/01_load_full_sample.py      builds the full-history event panel + era classification
 scripts/02_production_estimates.py  IV-GMM pass-through estimates (equity, corporate)
 scripts/03_build_dashboard_data.py  assembles the dashboard JSON payload
@@ -47,20 +47,22 @@ annual SOFR OIS forwards from 1Y to 10Y), `dtcc_expected_path_daily.csv`
 `python3 07_build_dtcc_ois_curves.py --report` prints coverage, package-vs-
 outright, forecast-error-vs-realized-EFFR and SOFR-OIS-vs-Treasury diagnostics.
 
-**Curve fit (`08_fit_dtcc_ois_spline.py`):** by default a *hybrid* forward
-curve: a step function with one level per FOMC meeting for the first ~13 months
-(fit to meeting-dated fed funds / SOFR OIS, spot-starting 1M-10Y SOFR OIS par
-swaps and the published EFFR), joined to a smooth penalized cubic spline out to
-10Y. `--model smooth` fits the spline only (6M-10Y par). Outputs:
-`dtcc_fitted_curve_daily.csv` (quarterly 3M forwards 0-5Y, EFFR-equivalent),
-`dtcc_fitted_steps_daily.csv` (post-meeting levels), `dtcc_fit_diagnostics_daily.csv`.
-Findings (`--report`): the hybrid reproduces raw meeting-dated fed funds OIS to
-~1bp (par ~0.8bp) and improves the 0-3M window vs realized EFFR (3.5bp vs 4.9bp
-MAE), but is no better than smooth-only at 6-12M (MAE ~24-26bp vs ~20-23bp) --
-curve fidelity there is not forecast skill, and the 6M/9M par closes are mostly
-all-day (stale) fallbacks. Treat months ~6-12 as the least reliable stretch; the
-spline penalty `--lam` and jump prior `--step-sigma` are judgments (results are
-insensitive to `--step-sigma` 10-100bp).
+**Curve fit (`08_fit_dtcc_ois_spline.py`):** the default `knots` model is a
+single cubic B-spline forward curve with a knot at every FOMC meeting inside
+~13 months (so it can pass through the meeting-dated points) and quarterly /
+annual knots out to 10Y, fit to meeting-dated fed funds and SOFR OIS, spot-
+starting 1M-10Y SOFR OIS par swaps and the published EFFR. The smoothness
+penalty is loose near term (`--lam-near`) and firmer at the long end (`--lam`).
+Alternatives for comparison: `--model hybrid` (meeting steps then spline) and
+`--model smooth` (stiff spline on 6M-10Y par only). Outputs:
+`dtcc_fitted_curve_daily.csv` (quarterly 3M forwards 0-5Y, EFFR-equivalent) and
+`dtcc_fit_diagnostics_daily.csv`. Findings (`--report`): `knots` reprices par to
+~1.2bp and meeting-dated swaps to ~2bp (no step), with few direction reversals
+(median 0, max 3 across 0-15M); error vs realized EFFR is the same as the hybrid
+(0-3M MAE ~3.4bp, 3-6M ~13.5bp) and worse than the stiff spline at 6-12M
+(~24-29bp vs ~20-23bp) -- tight curve fidelity is not forecast skill, and the
+6M-1Y par closes are mostly all-day fallbacks, so humps in months ~6-12 come
+from those pillars. `--lam-near` is a judgment (0.0003-0.03 changes little).
 
 Testing-grade caveats: the combined curve has no node for roughly months 6-12
 (meeting nodes thin out; the annual forwards start at 1Y); SOFR OIS is

@@ -1,5 +1,5 @@
 """
-Fit a forward curve (meeting steps near term + penalized cubic B-spline beyond) to the daily
+Fit an expected-funds-rate forward curve (cubic B-splines; see models below) to the daily
 spot-starting SOFR OIS par rates built by 07_build_dtcc_ois_curves.py.
 
 Why: the par swaps are deep from 6M to 10Y, but the forward rates implied by
@@ -506,19 +506,195 @@ def report_hybrid(par, fwd, path, basis, meet, effr, fits, diag, args):
           {h: round(float(tab5[h].diff().std() * 100), 1) for h in [0.25, 0.5, 1.0, 2.0, 3.0, 5.0] if h in tab5})
 
 
+# --------------------------------------------------------------------------
+# "knots" model: ONE cubic B-spline forward curve with a knot at every FOMC
+# meeting inside ~13M (so it can pass through the meeting-dated points) and
+# quarterly / annual knots beyond. Smoothness penalty is loose near term
+# (--lam-near) and firmer at the long end (--lam). Same observations as the
+# hybrid: meeting-dated swaps, spot-starting par swaps 1M-10Y, published EFFR.
+# --------------------------------------------------------------------------
+FAR_KNOTS = [1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5, 6, 8]
+NEAR_YRS = TCUT / 365
+
+
+def knot_basis(meet_off):
+    near = [m / 365 for m in meet_off]
+    interior = sorted(set(near + FAR_KNOTS))
+    clean = []
+    for k in interior:
+        if k < 0.03 or k > TMAX - 0.3:
+            continue
+        if clean and k - clean[-1] < 0.03:
+            continue
+        clean.append(k)
+    t = np.concatenate([[0.0] * (DEGREE + 1), clean, [TMAX] * (DEGREE + 1)])
+    x = (np.arange(HDAYS) + 0.5) / 365
+    B = BSpline.design_matrix(x, t, DEGREE, extrapolate=False).toarray()
+    CM = np.vstack([np.zeros((1, B.shape[1])), np.cumsum(B, axis=0) / 365])
+    h = 10
+    d = np.arange(h, HDAYS - h, h)
+    B2 = (B[d - h] - 2 * B[d] + B[d + h]) / (h / 365) ** 2
+    near_mask = d < TCUT
+    return CM, B, B2, near_mask, d
+
+
+def fit_day_knots(obs, meet_off, lam_far, lam_near, theta0=None):
+    CM, B, B2, near_mask, _ = knot_basis(meet_off)
+    sig = np.array([o[-1] for o in obs])
+    y = np.array([o[-2] for o in obs])
+    w = np.where(near_mask, np.sqrt(lam_near * 10 / 365), np.sqrt(lam_far * 10 / 365)) * 1e4 * 1e-1
+
+    def predict(th):
+        D = np.exp(-(CM @ th))
+        return np.array([model_obs(D, o) for o in obs])
+
+    def resid(th):
+        return np.concatenate([(predict(th) - y) * 1e4 / sig, w * (B2 @ th)])
+
+    th0 = np.full(B.shape[1], float(np.mean(y))) if theta0 is None else theta0
+    sol = least_squares(resid, th0, method="trf", x_scale=0.01)
+    return sol.x, (predict(sol.x) - y) * 1e4, CM
+
+
+def fit_all_knots(par, fwd, basis_by_date, effr, meetings, lam_far, lam_near,
+                  only_dates=None):
+    fwd = fwd[fwd["kind"] == "meeting"]
+    out, diag = {}, []
+    pg = {d: g for d, g in par[par["tenor"].isin(TENOR_YRS)].groupby("date")}
+    fg = {d: g for d, g in fwd.groupby("date")}
+    for d in sorted(pg):
+        if only_dates is not None and d not in only_dates:
+            continue
+        g = pg[d]
+        have = set(g["tenor"])
+        if len(g) < 5 or not ({"5Y", "7Y"} & have) or "10Y" not in have:
+            continue
+        b = basis_by_date.get(d, np.nan)
+        if not np.isfinite(b):
+            continue
+        meet_off = [(m - d).days for m in meetings if 0 < (m - d).days < TCUT]
+        ev = effr.reindex(effr.index.union([d])).ffill().get(d, np.nan)
+        obs = build_obs(d, g, fg.get(d, fg_empty(fwd)), b, ev)
+        th, res, CM = fit_day_knots(obs, meet_off, lam_far, lam_near)
+        out[d] = (th, CM, 0, meet_off, b)
+        kinds = [o[0] for o in obs]
+        pr = [r for r, k in zip(res, kinds) if k == "par"]
+        ir = [r for r, k in zip(res, kinds) if k == "int"]
+        diag.append({"date": d, "n_par": len(pr), "n_int": len(ir),
+                     "rmse_par_bp": float(np.sqrt(np.mean(np.square(pr)))) if pr else np.nan,
+                     "rmse_int_bp": float(np.sqrt(np.mean(np.square(ir)))) if ir else np.nan})
+    return out, pd.DataFrame(diag)
+
+
+def run_knots(args, dd):
+    par, fwd, path, basis, meet, effr = load_inputs(dd)
+    fits, diag = fit_all_knots(par, fwd, basis, effr, meet, args.lam, args.lam_near)
+    if not fits:
+        raise SystemExit("no days could be fitted")
+    h_curve_table(fits, args.max_horizon).to_csv(dd / "dtcc_fitted_curve_daily.csv", index=False)
+    diag.to_csv(dd / "dtcc_fit_diagnostics_daily.csv", index=False)
+    print(f"knots fit: {len(fits)} days; median RMSE par {diag.rmse_par_bp.median():.2f}bp, "
+          f"meeting-dated {diag.rmse_int_bp.median():.2f}bp")
+    if args.report:
+        report_knots(par, fwd, path, basis, meet, effr, fits, diag, args)
+
+
+def realized_errors(fits_by_model, effr):
+    rows = []
+    wins = [(0, 91), (91, 182), (182, 273), (273, 365)]
+    for name, fits in fits_by_model.items():
+        for d, entry in fits.items():
+            for a, b in wins:
+                end = d + pd.Timedelta(days=b)
+                if end > effr.index.max():
+                    continue
+                real = effr[(effr.index >= d + pd.Timedelta(days=a)) & (effr.index < end)].mean()
+                rows.append({"model": name, "date": d, "win": f"{a//30}-{b//30}M",
+                             "err_bp": (h_interval(entry, a, b) - real) * 100})
+    return pd.DataFrame(rows)
+
+
+def report_knots(par, fwd, path, basis, meet, effr, fits, diag, args):
+    print("\n=== knots model fit quality ===")
+    print("pricing error RMSE (bp): par median %.2f p90 %.2f | meeting-dated median %.2f p90 %.2f" % (
+        diag.rmse_par_bp.median(), diag.rmse_par_bp.quantile(.9),
+        diag.rmse_int_bp.median(), diag.rmse_int_bp.quantile(.9)))
+    hyb, _ = fit_all_hybrid(par, fwd, basis, effr, meet, args.lam, 30.0)
+    # smooth-only spline wrapped to the same (th, CM, K, meet_off, basis) interface is
+    # not needed: use its own interval_rate
+    sm, _ = fit_all(par, args.lam)
+    r = realized_errors({"knots": fits, "hybrid": hyb}, effr)
+    rs = []
+    for d, c in sm.items():
+        for a, b in [(0, 91), (91, 182), (182, 273), (273, 365)]:
+            end = d + pd.Timedelta(days=b)
+            if end > effr.index.max():
+                continue
+            real = effr[(effr.index >= d + pd.Timedelta(days=a)) & (effr.index < end)].mean()
+            rs.append({"model": "smooth", "date": d, "win": f"{a//30}-{b//30}M",
+                       "err_bp": (interval_rate(c, a / 365, b / 365) - basis.get(d, np.nan) - real) * 100})
+    r = pd.concat([r, pd.DataFrame(rs)])
+    g = r.groupby(["win", "model"])["err_bp"]
+    tab = pd.concat({"bias_bp": g.mean(), "mae_bp": g.agg(lambda s: s.abs().mean())}, axis=1).unstack("model")
+    print("\nerror vs realized mean EFFR over the window (implied - realized), bp:")
+    print(tab.round(1).to_string())
+
+    # agreement with raw meeting-dated fed funds OIS
+    m = path[(path["meeting_no"] >= 1) & (path["source"] == "ffr_ois")]
+    rows = []
+    for _, x in m.iterrows():
+        en = fits.get(x["date"])
+        if en is None:
+            continue
+        a, b = (x["node_start"] - x["date"]).days, (x["node_end"] - x["date"]).days
+        if a < 1 or b > HDAYS:
+            continue
+        rows.append({"h": a, "diff_bp": (h_interval(en, a, b) - x["ffr"]) * 100})
+    o = pd.DataFrame(rows)
+    o["bucket"] = pd.cut(o["h"], [0, 30, 91, 182, 400], labels=["<1M", "1-3M", "3-6M", "6-13M"])
+    print("\nknots minus raw meeting-dated fed funds OIS (bp, in sample):")
+    print(o.groupby("bucket", observed=True)["diff_bp"].agg(
+        n="size", mean="mean", mae=lambda s: s.abs().mean()).round(1).to_string())
+
+    # roughness: share of days with a near-term wiggle (curve direction reversals within 13M)
+    tab5 = h_curve_table(fits, 5).pivot(index="date", columns="horizon_yrs",
+                                        values="fwd3m_effr_equiv_pct")
+    print("\ndaily change sd of fitted 3M forward (bp):",
+          {h: round(float(tab5[h].diff().std() * 100), 1) for h in [0.25, 0.5, 1.0, 2.0, 3.0, 5.0] if h in tab5})
+    near = tab5[[h for h in tab5.columns if h <= 1.25]].to_numpy()
+    sc = np.sum(np.diff(np.sign(np.diff(near, axis=1)), axis=1) != 0, axis=1)
+    print("curve-direction reversals within 0-15M of quarterly points: median %.0f, p90 %.0f, max %d" % (
+        np.median(sc), np.quantile(sc, .9), sc.max()))
+
+    # lambda_near sensitivity on a subsample
+    dates = set(sorted(fits)[::10])
+    print("\nlam-near sensitivity (every 10th day): RMSE par/meeting bp | MAE vs realized 0-3M / 6-9M (bp)")
+    for ln in [args.lam_near / 10, args.lam_near, args.lam_near * 10, args.lam_near * 100]:
+        f2, d2 = fit_all_knots(par, fwd, basis, effr, meet, args.lam, ln, only_dates=dates)
+        rr = realized_errors({"k": f2}, effr)
+        mae = rr.groupby("win")["err_bp"].agg(lambda s: s.abs().mean())
+        print(f"  lam_near={ln:g}: {d2.rmse_par_bp.mean():.2f}/{d2.rmse_int_bp.mean():.2f} | "
+              f"{mae.get('0-3M', np.nan):.1f} / {mae.get('6-9M', np.nan):.1f}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-dir", default="../data")
     ap.add_argument("--lam", type=float, default=0.3, help="curvature penalty weight")
     ap.add_argument("--max-horizon", type=float, default=5.0)
-    ap.add_argument("--model", choices=["hybrid", "smooth"], default="hybrid",
-                    help="hybrid = meeting steps for ~13M then spline (default); "
-                         "smooth = spline only, no near-term meeting data")
+    ap.add_argument("--model", choices=["knots", "hybrid", "smooth"], default="knots",
+                    help="knots = one spline with a knot at every meeting within ~13M "
+                         "(default); hybrid = meeting steps then spline; smooth = "
+                         "stiff spline on 6M-10Y par only")
+    ap.add_argument("--lam-near", type=float, default=0.003,
+                    help="knots model: curvature penalty inside ~13M (loose)")
     ap.add_argument("--step-sigma", type=float, default=30.0,
                     help="bp; prior sd of jumps between adjacent meeting steps")
     ap.add_argument("--report", action="store_true")
     args = ap.parse_args()
     dd = Path(args.data_dir)
+    if args.model == "knots":
+        return run_knots(args, dd)
     if args.model == "hybrid":
         return run_hybrid(args, dd)
 
