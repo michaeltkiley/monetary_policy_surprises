@@ -1,0 +1,11 @@
+bank,from,to,test,cur,near,y1,y2,y10
+Fed,I Pre-guidance,II Near-term guidance,smaller,0.0,0.0,0.482,0.354,0.601
+Fed,"Crisis, no guidance",III Expanded (GFC/ZLB),smaller,0.014,0.005,0.286,0.147,0.764
+Fed,III Expanded (GFC/ZLB),IV Retreat,larger,0.6,0.382,0.003,0.013,0.632
+Fed,IV Retreat,V Warsh,larger,0.13,0.002,0.204,0.14,0.356
+Fed,III Expanded (GFC/ZLB),V Warsh,larger,0.109,0.037,0.037,0.024,0.358
+ECB,I Pre-guidance,II Near-term guidance,smaller,0.0,0.317,0.892,0.96,0.835
+ECB,"Crisis, no guidance",III Expanded (GFC/ZLB),smaller,0.01,0.002,0.0,0.003,0.639
+ECB,III Expanded (GFC/ZLB),IV Retreat,larger,0.057,0.013,0.0,0.0,0.023
+BoE,"Crisis, no guidance",III Expanded (GFC/ZLB),smaller,0.204,0.036,0.442,0.53,0.269
+BoE,III Expanded (GFC/ZLB),IV Retreat,larger,0.0,0.011,0.326,0.238,0.488
